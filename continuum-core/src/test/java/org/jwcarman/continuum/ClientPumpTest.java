@@ -17,6 +17,7 @@ package org.jwcarman.continuum;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -292,6 +293,109 @@ class ClientPumpTest {
   }
 
   @Nested
+  class Retryable_config_validation {
+    @Test
+    void retryable_kind_accessor_reports_the_kind() {
+      assertThat(retryable().kind()).isEqualTo(KIND);
+    }
+
+    @Test
+    void register_requires_a_continuation() {
+      assertThatNullPointerException()
+          .isThrownBy(() -> retryable().register(ComputationId.random(), null));
+    }
+
+    @Test
+    void resolved_registration_decodes_expired_outcomes() {
+      var id = ComputationId.random();
+      when(continuum.registerContinuation(any(), any()))
+          .thenReturn(
+              new RegistrationResult.Resolved(
+                  Outcome.expired(ExpiryKind.RETRY_DISALLOWED, "deadline passed")));
+      assertThat(retryable().register(id, "late"))
+          .isEqualTo(
+              new TypedRegistration.Resolved<>(
+                  new TypedOutcome.Expired<>(ExpiryKind.RETRY_DISALLOWED, "deadline passed")));
+    }
+
+    @Test
+    void retryable_deadline_is_required() {
+      assertThatIllegalStateException()
+          .isThrownBy(
+              () ->
+                  continuum.client(
+                      "k",
+                      String.class,
+                      String.class,
+                      String.class,
+                      cfg ->
+                          cfg.resultCodec(ClientMintingTest.STRINGS)
+                              .continuationCodec(ClientMintingTest.STRINGS)
+                              .dispatchCodec(ClientMintingTest.STRINGS)));
+    }
+
+    @Test
+    void retryable_unresolvable_dispatch_codec_fails_at_mint_time() {
+      assertThatIllegalStateException()
+          .isThrownBy(
+              () ->
+                  continuum.client(
+                      "k",
+                      String.class,
+                      String.class,
+                      String.class,
+                      cfg ->
+                          cfg.resultCodec(ClientMintingTest.STRINGS)
+                              .continuationCodec(ClientMintingTest.STRINGS)
+                              .deadline(Duration.ofMinutes(1))));
+    }
+
+    @Test
+    void retryable_codecs_resolve_through_the_factory() {
+      CodecFactory factory =
+          new CodecFactory() {
+            @Override
+            public <T> Codec<T> create(TypeRef<T> typeRef) {
+              return new Codec<>() {
+                @Override
+                public byte[] encode(T value) {
+                  return value.toString().getBytes(UTF_8);
+                }
+
+                @Override
+                public T decode(byte[] bytes) {
+                  throw new UnsupportedOperationException("decode is not exercised by this test");
+                }
+              };
+            }
+          };
+      when(continuum.create(any()))
+          .thenAnswer(
+              invocation -> {
+                ComputationRequest request = invocation.getArgument(0);
+                return new Computation(
+                    ComputationId.random(),
+                    request.kind(),
+                    ComputationStatus.PENDING,
+                    NOW,
+                    request.deadline(),
+                    request.dispatchPayload(),
+                    1,
+                    null);
+              });
+      var client =
+          continuum.client(
+              "factory-kind",
+              String.class,
+              String.class,
+              String.class,
+              cfg -> cfg.codecs(factory).deadline(Duration.ofMinutes(1)));
+      var computation = client.create("continuation", "dispatch");
+      assertThat(computation.dispatchPayload()).isEqualTo("dispatch".getBytes(UTF_8));
+    }
+  }
+
+  @Nested
   class Codec_factory_resolution {
     @Test
     void unset_codecs_resolve_through_the_factory() {
@@ -429,6 +533,30 @@ class ClientPumpTest {
       when(repository.claimDeliveries(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
       assertThat(client.deliverResults(BatchSize.of(5), (c, o) -> {})).isZero();
       assertThat(client.kind()).isEqualTo(KIND);
+    }
+
+    @Test
+    void one_shot_explicit_lease_and_purge_overloads_work() {
+      when(repository.claimDeliveries(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
+      when(repository.purgeResults(any(), any(), anyInt())).thenReturn(2);
+      var client =
+          continuum.client(
+              "tool",
+              String.class,
+              String.class,
+              cfg ->
+                  cfg.resultCodec(ClientMintingTest.STRINGS)
+                      .continuationCodec(ClientMintingTest.STRINGS)
+                      .deadline(Duration.ofMinutes(5)));
+
+      assertThat(
+              client.deliverResults(
+                  BatchSize.of(3), Lease.ofSeconds(45), Backoff.ofSeconds(5), (c, o) -> {}))
+          .isZero();
+      verify(repository)
+          .claimDeliveries(any(), eq(KIND), eq(3), eq(Duration.ofSeconds(45)), eq(NOW));
+      assertThat(client.purgeExpiredResults(BatchSize.of(9), ResultTtl.ofMinutes(30))).isEqualTo(2);
+      verify(repository).purgeResults(KIND, NOW.minus(Duration.ofMinutes(30)), 9);
     }
 
     @Test

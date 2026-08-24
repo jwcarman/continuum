@@ -16,6 +16,7 @@
 package org.jwcarman.continuum;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import java.time.Duration;
@@ -70,6 +71,12 @@ class RetryTest {
 
       assertThat(dispatched).isEmpty();
       assertThat(result).isEqualTo(RetryResult.notRetried("attempts exhausted (3 of 3)"));
+    }
+
+    @Test
+    void at_most_requires_a_positive_count() {
+      assertThatIllegalArgumentException()
+          .isThrownBy(() -> Retry.of(r -> r.atMost(0).handler((d, c) -> {})));
     }
 
     @Test

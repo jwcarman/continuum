@@ -25,6 +25,7 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.continuum.spi.StoredContinuation;
 
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ValueTypesTest {
@@ -109,7 +110,13 @@ class ValueTypesTest {
     @Test
     void unit_factories_agree_with_of() {
       assertThat(Lease.ofSeconds(30)).isEqualTo(Lease.of(Duration.ofSeconds(30)));
+      assertThat(Lease.ofMinutes(2)).isEqualTo(Lease.of(Duration.ofMinutes(2)));
+      assertThat(Lease.ofHours(1)).isEqualTo(Lease.of(Duration.ofHours(1)));
+      assertThat(Backoff.ofSeconds(30)).isEqualTo(Backoff.of(Duration.ofSeconds(30)));
       assertThat(Backoff.ofMinutes(2)).isEqualTo(Backoff.of(Duration.ofMinutes(2)));
+      assertThat(Backoff.ofHours(1)).isEqualTo(Backoff.of(Duration.ofHours(1)));
+      assertThat(ResultTtl.ofSeconds(30)).isEqualTo(ResultTtl.of(Duration.ofSeconds(30)));
+      assertThat(ResultTtl.ofMinutes(2)).isEqualTo(ResultTtl.of(Duration.ofMinutes(2)));
       assertThat(ResultTtl.ofHours(1)).isEqualTo(ResultTtl.of(Duration.ofHours(1)));
     }
   }
@@ -191,6 +198,142 @@ class ValueTypesTest {
           .isNotEqualTo(Outcome.failure("f"))
           .isNotEqualTo("not an outcome")
           .hasSameHashCodeAs(Outcome.success(new byte[] {1}));
+    }
+
+    @Test
+    void computations_differ_when_any_field_differs() {
+      var base = computation(new byte[] {1}, null);
+      assertThat(base)
+          .isNotEqualTo("not a computation")
+          .isNotEqualTo(
+              new Computation(
+                  ComputationId.random(),
+                  base.kind(),
+                  base.status(),
+                  base.createdAt(),
+                  base.deadline(),
+                  base.dispatchPayload(),
+                  base.attemptCount(),
+                  null))
+          .isNotEqualTo(
+              new Computation(
+                  base.id(),
+                  new ComputationKind("other"),
+                  base.status(),
+                  base.createdAt(),
+                  base.deadline(),
+                  base.dispatchPayload(),
+                  base.attemptCount(),
+                  null))
+          .isNotEqualTo(
+              new Computation(
+                  base.id(),
+                  base.kind(),
+                  ComputationStatus.FAILED,
+                  base.createdAt(),
+                  base.deadline(),
+                  base.dispatchPayload(),
+                  base.attemptCount(),
+                  Outcome.failure("f")))
+          .isNotEqualTo(
+              new Computation(
+                  base.id(),
+                  base.kind(),
+                  base.status(),
+                  base.createdAt().plusSeconds(1),
+                  base.deadline(),
+                  base.dispatchPayload(),
+                  base.attemptCount(),
+                  null))
+          .isNotEqualTo(
+              new Computation(
+                  base.id(),
+                  base.kind(),
+                  base.status(),
+                  base.createdAt(),
+                  base.deadline().plusSeconds(1),
+                  base.dispatchPayload(),
+                  base.attemptCount(),
+                  null))
+          .isNotEqualTo(
+              new Computation(
+                  base.id(),
+                  base.kind(),
+                  base.status(),
+                  base.createdAt(),
+                  base.deadline(),
+                  base.dispatchPayload(),
+                  2,
+                  null));
+    }
+
+    @Test
+    void requests_differ_when_any_field_differs() {
+      var base =
+          new ComputationRequest(new ComputationKind("k"), new byte[] {1}, Instant.EPOCH, null);
+      assertThat(base)
+          .isNotEqualTo("not a request")
+          .isNotEqualTo(
+              new ComputationRequest(new ComputationKind("o"), new byte[] {1}, Instant.EPOCH, null))
+          .isNotEqualTo(
+              new ComputationRequest(new ComputationKind("k"), new byte[] {2}, Instant.EPOCH, null))
+          .isNotEqualTo(
+              new ComputationRequest(
+                  new ComputationKind("k"), new byte[] {1}, Instant.EPOCH.plusSeconds(1), null));
+    }
+
+    @Test
+    void deliveries_differ_when_any_field_differs() {
+      var computationId = ComputationId.random();
+      var continuationId = ContinuationId.random();
+      var kind = new ComputationKind("k");
+      var base =
+          new CompletionDelivery(
+              computationId, kind, continuationId, new byte[] {1}, Outcome.failure("f"));
+      assertThat(base)
+          .isNotEqualTo("not a delivery")
+          .isNotEqualTo(
+              new CompletionDelivery(
+                  ComputationId.random(),
+                  kind,
+                  continuationId,
+                  new byte[] {1},
+                  Outcome.failure("f")))
+          .isNotEqualTo(
+              new CompletionDelivery(
+                  computationId,
+                  new ComputationKind("o"),
+                  continuationId,
+                  new byte[] {1},
+                  Outcome.failure("f")))
+          .isNotEqualTo(
+              new CompletionDelivery(
+                  computationId,
+                  kind,
+                  ContinuationId.random(),
+                  new byte[] {1},
+                  Outcome.failure("f")))
+          .isNotEqualTo(
+              new CompletionDelivery(
+                  computationId, kind, continuationId, new byte[] {2}, Outcome.failure("f")))
+          .isNotEqualTo(
+              new CompletionDelivery(
+                  computationId, kind, continuationId, new byte[] {1}, Outcome.failure("g")));
+    }
+
+    @Test
+    void stored_continuations_differ_when_any_field_differs() {
+      var id = ContinuationId.random();
+      var base = new StoredContinuation(id, new byte[] {1});
+      assertThat(base)
+          .isNotEqualTo("not a continuation")
+          .isNotEqualTo(new StoredContinuation(ContinuationId.random(), new byte[] {1}))
+          .isNotEqualTo(new StoredContinuation(id, new byte[] {2}));
+    }
+
+    @Test
+    void success_never_equals_null() {
+      assertThat(Outcome.success(new byte[] {1}).equals(null)).isFalse();
     }
 
     @Test

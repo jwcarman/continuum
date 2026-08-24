@@ -17,6 +17,7 @@ package org.jwcarman.continuum.memory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -31,6 +32,8 @@ import org.jwcarman.continuum.ComputationStatus;
 import org.jwcarman.continuum.ContinuationId;
 import org.jwcarman.continuum.Outcome;
 import org.jwcarman.continuum.spi.CompletionOutcome;
+import org.jwcarman.continuum.spi.ContinuumPersistenceException;
+import org.jwcarman.continuum.spi.DeliveryId;
 import org.jwcarman.continuum.spi.StoredContinuation;
 
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
@@ -70,6 +73,50 @@ class InMemoryContinuumRepositoryTest {
         repository.claimDeliveries("w", KIND, 10, Duration.ofSeconds(30), NOW.plusSeconds(1));
     assertThat(claimed).hasSize(1);
     assertThat(claimed.getFirst().delivery().outcome()).isEqualTo(outcome);
+  }
+
+  @Test
+  void duplicate_creation_is_rejected_while_pending_and_after_completion() {
+    var id = ComputationId.random();
+    repository.createComputation(
+        pending(id), new StoredContinuation(ContinuationId.random(), "c".getBytes(UTF_8)));
+    assertThatExceptionOfType(ContinuumPersistenceException.class)
+        .isThrownBy(
+            () ->
+                repository.createComputation(
+                    pending(id),
+                    new StoredContinuation(ContinuationId.random(), "c".getBytes(UTF_8))));
+    repository.complete(id, Outcome.failure("f"), NOW.plusSeconds(1));
+    assertThatExceptionOfType(ContinuumPersistenceException.class)
+        .isThrownBy(
+            () ->
+                repository.createComputation(
+                    pending(id),
+                    new StoredContinuation(ContinuationId.random(), "c".getBytes(UTF_8))));
+  }
+
+  @Test
+  void unknown_delivery_operations_are_no_ops() {
+    repository.acknowledgeDelivery(DeliveryId.random());
+    repository.releaseDelivery(DeliveryId.random(), NOW);
+    repository.extendDeadline(ComputationId.random(), NOW.plusSeconds(60), 2);
+    assertThat(repository.findComputation(ComputationId.random())).isEmpty();
+  }
+
+  @Test
+  void operations_are_isolated_by_kind() {
+    var otherKind = new ComputationKind("other");
+    var id = ComputationId.random();
+    repository.createComputation(
+        pending(id), new StoredContinuation(ContinuationId.random(), "c".getBytes(UTF_8)));
+    repository.complete(id, Outcome.success("r".getBytes(UTF_8)), NOW.plusSeconds(1));
+
+    assertThat(
+            repository.claimDeliveries(
+                "w", otherKind, 10, Duration.ofSeconds(30), NOW.plusSeconds(2)))
+        .isEmpty();
+    assertThat(repository.findExpired(otherKind, NOW.plusSeconds(600), 10)).isEmpty();
+    assertThat(repository.purgeResults(otherKind, NOW.plusSeconds(600), 10)).isZero();
   }
 
   @Test
