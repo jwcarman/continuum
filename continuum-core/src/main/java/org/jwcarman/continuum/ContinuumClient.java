@@ -1,0 +1,72 @@
+/*
+ * Copyright © 2026 James Carman
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.jwcarman.continuum;
+
+import java.time.Duration;
+import java.util.function.BiConsumer;
+
+public final class ContinuumClient<R, C> {
+
+  private final ClientSupport<R, C> support;
+
+  ContinuumClient(ClientSupport<R, C> support) {
+    this.support = support;
+  }
+
+  public Computation create(C continuation) {
+    return support.create(continuation, null, null);
+  }
+
+  public Computation create(C continuation, Duration deadlineOverride) {
+    return support.create(continuation, null, deadlineOverride);
+  }
+
+  public CompletionResult complete(ComputationId id, R result) {
+    return support.complete(id, result);
+  }
+
+  public CompletionResult fail(ComputationId id, String message) {
+    return support.fail(id, message);
+  }
+
+  public TypedRegistration<R> register(ComputationId id, C continuation) {
+    return support.register(id, continuation);
+  }
+
+  public int deliverResults(int batchSize, BiConsumer<C, TypedOutcome<R>> consumer) {
+    return support.deliverResults(batchSize, consumer);
+  }
+
+  public int reapExpiredComputations(int batchSize) {
+    int reaped = 0;
+    for (Computation computation : support.findExpired(batchSize)) {
+      support.failExpired(
+          computation,
+          ExpiryKind.RETRY_DISALLOWED,
+          "deadline " + computation.deadline() + " passed");
+      reaped++;
+    }
+    return reaped;
+  }
+
+  public int purgeExpiredResults(int batchSize, Duration ttl) {
+    return support.purgeExpiredResults(batchSize, ttl);
+  }
+
+  public ComputationKind kind() {
+    return support.kind();
+  }
+}

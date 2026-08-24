@@ -1,0 +1,19 @@
+logs/
+target/
+.idea/
+
+# Eclipse / Eclipse JDT language server
+.project
+.classpath
+.factorypath
+.settings/
+.apt_generated/
+
+# maven-release-plugin / versions-maven-plugin backup files
+release.properties
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+pom.xml.tag
+pom.xml.backup
+bin/

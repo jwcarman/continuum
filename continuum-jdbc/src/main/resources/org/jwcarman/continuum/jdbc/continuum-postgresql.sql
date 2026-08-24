@@ -1,0 +1,54 @@
+CREATE TABLE IF NOT EXISTS continuum_computation (
+    id UUID PRIMARY KEY,
+    kind VARCHAR(200) NOT NULL,
+    deadline_at TIMESTAMPTZ NOT NULL,
+    dispatch_payload BYTEA,
+    attempt_count INT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    last_updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_continuum_computation_kind_deadline
+    ON continuum_computation (kind, deadline_at);
+
+CREATE TABLE IF NOT EXISTS continuum_continuation (
+    id UUID PRIMARY KEY,
+    computation_id UUID NOT NULL REFERENCES continuum_computation (id),
+    payload BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_continuum_continuation_computation
+    ON continuum_continuation (computation_id);
+
+CREATE TABLE IF NOT EXISTS continuum_result (
+    computation_id UUID PRIMARY KEY,
+    kind VARCHAR(200) NOT NULL,
+    outcome_type VARCHAR(20) NOT NULL,
+    outcome_payload BYTEA,
+    expiry_kind VARCHAR(20),
+    message TEXT,
+    deadline_at TIMESTAMPTZ NOT NULL,
+    attempt_count INT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    completed_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_continuum_result_kind_completed
+    ON continuum_result (kind, completed_at);
+
+CREATE TABLE IF NOT EXISTS continuum_outbox (
+    id UUID PRIMARY KEY,
+    computation_id UUID NOT NULL,
+    continuation_id UUID NOT NULL,
+    kind VARCHAR(200) NOT NULL,
+    continuation_payload BYTEA NOT NULL,
+    outcome_type VARCHAR(20) NOT NULL,
+    outcome_payload BYTEA,
+    expiry_kind VARCHAR(20),
+    message TEXT,
+    available_at TIMESTAMPTZ NOT NULL,
+    claimed_by VARCHAR(200),
+    claimed_until TIMESTAMPTZ,
+    attempt_count INT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_continuum_outbox_kind_available
+    ON continuum_outbox (kind, available_at);
