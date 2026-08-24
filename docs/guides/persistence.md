@@ -10,6 +10,22 @@ and `BYTEA`. A lowest-common-denominator ANSI provider would forfeit exactly
 the concurrency properties the outbox depends on; other databases deserve
 their own providers certified against the TCK.
 
+!!! warning "PostgreSQL means PostgreSQL"
+    Wire-compatible databases — CockroachDB, YugabyteDB — report `PostgreSQL`
+    through the product name and version that any detector reads, and they
+    **accept** `FOR UPDATE SKIP LOCKED` rather than rejecting it. Neither is
+    tested or supported here.
+
+    So the failure mode is silent: the driver connects, the metadata says
+    PostgreSQL, the claim query parses and runs, and nothing warns you. But
+    parse success is not semantic support, and `claimDeliveries` is the one
+    operation where the difference is load-bearing — the competing-consumer
+    guarantee above rests on PostgreSQL's lock semantics specifically.
+
+    Certify against the TCK before trusting either. The concurrency battery
+    asserts observable contract rather than mechanism, so it can settle the
+    question in both directions.
+
 ### Schema — yours, not ours
 
 Continuum **never creates or migrates schema**. The reference DDL ships as a
