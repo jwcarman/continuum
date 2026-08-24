@@ -24,10 +24,16 @@ jobs:
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
       - name: Set version
+        # The tag reaches Maven through the environment, never interpolated into the
+        # shell command: ${{ }} substitution happens before the shell runs, so a
+        # crafted tag name would execute as script.
+        #
         # processAllModules is required: continuum-bom is deliberately parentless, so
         # versions:set cannot reach it through a parent reference and would otherwise
         # publish it still carrying -SNAPSHOT.
-        run: mvn versions:set -DnewVersion=${{ github.event.release.tag_name }} -DprocessAllModules=true
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: mvn versions:set -DnewVersion="$RELEASE_TAG" -DprocessAllModules=true
 
       - name: Publish package
         run: mvn -P release --batch-mode deploy -DskipTests

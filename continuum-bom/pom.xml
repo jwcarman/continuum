@@ -75,7 +75,27 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <gpg.plugin.version>3.2.8</gpg.plugin.version>
         <sonatype.plugin.version>0.10.0</sonatype.plugin.version>
+        <sonar.plugin.version>5.5.0.6356</sonar.plugin.version>
+        <!-- Nothing to analyse: this module is a dependencyManagement declaration. -->
+        <sonar.skip>true</sonar.skip>
     </properties>
+
+    <build>
+        <plugins>
+            <!--
+                CI runs `mvn verify sonar:sonar` across the reactor, and Maven resolves
+                the `sonar` prefix from each project's own build plugins. Having no
+                parent, this module inherits none, so the prefix fails here and takes
+                the whole build with it. Declared to keep the prefix resolvable;
+                sonar.skip above means it does no work.
+            -->
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>${sonar.plugin.version}</version>
+            </plugin>
+        </plugins>
+    </build>
 
     <dependencyManagement>
         <dependencies>
