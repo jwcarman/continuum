@@ -129,8 +129,9 @@ class ValueTypesTest {
       var b =
           new ComputationRequest(
               new ComputationKind("k"), new byte[] {1}, Instant.EPOCH, new byte[] {2});
-      assertThat(a).isEqualTo(b).hasSameHashCodeAs(b);
       assertThat(a)
+          .isEqualTo(b)
+          .hasSameHashCodeAs(b)
           .isNotEqualTo(
               new ComputationRequest(
                   new ComputationKind("k"), new byte[] {1}, Instant.EPOCH, null));
