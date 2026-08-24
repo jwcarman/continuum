@@ -421,6 +421,18 @@ class ValueTypesTest {
     }
 
     @Test
+    void stored_continuations_compare_payloads_by_content() {
+      var id = ContinuationId.random();
+      // Distinct arrays, equal contents. This is the assertion that pins the
+      // Arrays.equals override: the inequality cases below pass either way,
+      // because distinct arrays are unequal by reference too.
+      var a = new StoredContinuation(id, new byte[] {1, 2});
+      var b = new StoredContinuation(id, new byte[] {1, 2});
+
+      assertThat(a).isEqualTo(b).hasSameHashCodeAs(b);
+    }
+
+    @Test
     void stored_continuations_differ_when_any_field_differs() {
       var id = ContinuationId.random();
       var base = new StoredContinuation(id, new byte[] {1});

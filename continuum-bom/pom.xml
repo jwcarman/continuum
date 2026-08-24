@@ -33,6 +33,36 @@
     the guarantee, and these values are set-once rather than evolving.
 
     Manage only artifacts this project owns here. Nothing else.
+
+    WHAT ELSE PARENTLESS COSTS
+
+    Having no parent means inheriting no build configuration either, and most of
+    what breaks does so quietly. Three known consequences:
+
+    1. Plugin prefixes stop resolving. `mvn spotless:apply` and `mvn sonar:sonar`
+       are read from each project's own build plugins or Maven's default plugin
+       groups (org.apache.maven.plugins, org.codehaus.mojo). Anything with a
+       third-party groupId fails here and takes the reactor with it — hence the
+       two stub declarations below. This one is loud.
+
+    2. `versions:set` skips this module. It walks parent references, so a release
+       would publish this BOM still carrying -SNAPSHOT, to a repository where
+       artifacts are immutable. The publish workflow passes
+       -DprocessAllModules=true for exactly this reason; do not remove it.
+
+    3. THE APACHE HEADER ABOVE IS NOT CHECKED. The license-maven-plugin runs from
+       the `license` profile in continuum-parent, which this file does not
+       inherit. Verified: stripping the header and running `mvn -P license
+       validate` still reports BUILD SUCCESS. Keep the header correct by hand —
+       nothing will tell you if it drifts or disappears.
+
+       Duplicating the plugin config here was considered and rejected: the inline
+       header is static, and copying it would create the drift risk it exists to
+       prevent.
+
+    The general rule: anything driven by a profile or plugin in continuum-parent
+    no longer applies to this file, and only the prefix failures announce
+    themselves. Check deliberately rather than waiting to trip over them.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
