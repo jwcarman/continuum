@@ -113,15 +113,30 @@ public final class ContinuumClient<R, C> {
 
   /**
    * Claims up to a batch of this kind's outbox deliveries under the default 30-second lease,
-   * decodes each, and invokes the consumer. Success acknowledges (deletes) the delivery; a consumer
-   * exception releases it with the default 30-second backoff and an incremented delivery attempt —
-   * one delivery's failure never blocks the others. At-least-once: deduplicate on {@link
-   * TypedDelivery#continuationId()}.
+   * decodes each, and invokes the consumer.
+   *
+   * <p><strong>Returning acknowledges the delivery; throwing releases it.</strong> That is the
+   * whole contract, and both directions are load-bearing:
+   *
+   * <ul>
+   *   <li><strong>Return normally</strong> and the delivery is acknowledged — deleted, never
+   *       redelivered. This is how you <em>consume without acting</em>: a consumer that decides a
+   *       delivery is stale or irrelevant returns, and it stops coming back.
+   *   <li><strong>Throw any {@link RuntimeException}</strong> and the delivery is released with the
+   *       call-site backoff and an incremented {@link TypedDelivery#deliveryAttempt()}, to be
+   *       redelivered later. One delivery's failure never blocks the others in the batch.
+   * </ul>
+   *
+   * <p>Nothing caps redelivery, so a consumer that always throws is retried forever. Use {@link
+   * TypedDelivery#deliveryAttempt()} to dead-letter and return, rather than throwing indefinitely.
+   *
+   * <p>Delivery is at-least-once: deduplicate on {@link TypedDelivery#continuationId()}, which is
+   * stable across redeliveries.
    *
    * <p>The consumer receives the whole {@link TypedDelivery}, not just the continuation and
-   * outcome: identities to correlate a log line against, {@link TypedDelivery#elapsedTime()} to
-   * record end-to-end duration as the outcome arrives, and {@link TypedDelivery#deliveryAttempt()}
-   * for a give-up or dead-letter policy.
+   * outcome: identities to correlate a log line against — or to check a delivery against your own
+   * state before acting — {@link TypedDelivery#elapsedTime()} to record end-to-end duration as the
+   * outcome arrives, and {@link TypedDelivery#deliveryAttempt()} for a give-up policy.
    *
    * @param batchSize the maximum deliveries to process
    * @param consumer receives the decoded delivery
