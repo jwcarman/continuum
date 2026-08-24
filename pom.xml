@@ -46,8 +46,8 @@
         <logback.version>1.5.18</logback.version>
         <junit.version>5.14.0</junit.version>
         <assertj.version>3.27.3</assertj.version>
-        <mockito.version>5.20.0</mockito.version>
-        <bytebuddy.version>1.17.5</bytebuddy.version>
+        <mockito.version>5.23.0</mockito.version>
+        <bytebuddy.version>1.18.8</bytebuddy.version>
         <testcontainers.version>1.21.3</testcontainers.version>
         <postgresql.version>42.7.7</postgresql.version>
 
@@ -112,6 +112,11 @@
                 <groupId>org.mockito</groupId>
                 <artifactId>mockito-core</artifactId>
                 <version>${mockito.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy</artifactId>
+                <version>${bytebuddy.version}</version>
             </dependency>
             <dependency>
                 <groupId>net.bytebuddy</groupId>
