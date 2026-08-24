@@ -21,6 +21,11 @@ package org.jwcarman.continuum.api;
  */
 public class ComputationNotFoundException extends RuntimeException {
 
+  /**
+   * Names the computation that could not be found.
+   *
+   * @param id the unknown or purged computation
+   */
   public ComputationNotFoundException(ComputationId id) {
     super("computation not found: " + id.value());
   }

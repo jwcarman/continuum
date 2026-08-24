@@ -18,10 +18,21 @@ package org.jwcarman.continuum.spi;
 /** A persistence operation failed; the enclosing transaction was rolled back. */
 public class ContinuumPersistenceException extends RuntimeException {
 
+  /**
+   * A failure with no underlying cause to carry.
+   *
+   * @param message what failed
+   */
   public ContinuumPersistenceException(String message) {
     super(message);
   }
 
+  /**
+   * A failure wrapping the provider exception that caused it.
+   *
+   * @param message what failed
+   * @param cause the underlying provider failure
+   */
   public ContinuumPersistenceException(String message, Throwable cause) {
     super(message, cause);
   }

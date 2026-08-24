@@ -18,13 +18,27 @@ package org.jwcarman.continuum.spi;
 import java.util.Objects;
 import java.util.UUID;
 
-/** The identity of one outbox row. */
+/**
+ * The identity of one outbox row.
+ *
+ * @param value the underlying identity
+ */
 public record DeliveryId(UUID value) {
 
+  /**
+   * Requires an identity.
+   *
+   * @throws NullPointerException if {@code value} is null
+   */
   public DeliveryId {
     Objects.requireNonNull(value, "value must not be null");
   }
 
+  /**
+   * A new random identity.
+   *
+   * @return a fresh, globally unique id
+   */
   public static DeliveryId random() {
     return new DeliveryId(UUID.randomUUID());
   }

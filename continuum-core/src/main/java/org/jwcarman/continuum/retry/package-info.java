@@ -17,6 +17,6 @@
  * The retry abstraction: {@link org.jwcarman.continuum.retry.Retry} performs (or schedules) a
  * redispatch itself and reports what it did. Attempt count is the only retry state Continuum
  * persists; limits and pacing are policy computed inside the retry from the durable facts carried
- * by {@link org.jwcarman.continuum.retry.RetryContext}.
+ * by {@link org.jwcarman.continuum.api.ExpiryContext}.
  */
 package org.jwcarman.continuum.retry;

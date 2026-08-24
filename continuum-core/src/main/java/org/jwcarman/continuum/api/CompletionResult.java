@@ -21,7 +21,13 @@ package org.jwcarman.continuum.api;
  * computation, or its result has been purged.
  */
 public enum CompletionResult {
+  /** This call won: the outcome it supplied is now the computation's sealed, memoized result. */
   COMPLETED,
+  /**
+   * The outcome was already sealed by an earlier call, which wins. This report was late or a
+   * duplicate, and the stored outcome is unchanged.
+   */
   ALREADY_RESOLVED,
+  /** No such computation — it never existed, or its result has been purged. */
   NOT_FOUND
 }

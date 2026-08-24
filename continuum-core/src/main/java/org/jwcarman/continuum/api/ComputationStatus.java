@@ -20,8 +20,12 @@ package org.jwcarman.continuum.api;
  * record present, or the memoized outcome's arm.
  */
 public enum ComputationStatus {
+  /** The pending record is still present: no outcome has been sealed yet. */
   PENDING,
+  /** Resolved with {@link Outcome.Success} — the producer answered. */
   COMPLETED,
+  /** Resolved with {@link Outcome.Failure} — the producer reported a definite "no". */
   FAILED,
+  /** Resolved with {@link Outcome.Expired} — the deadline lapsed without an answer. */
   EXPIRED
 }

@@ -23,10 +23,23 @@ import java.util.Objects;
  * A request to create a computation: the kind, the mandatory initial continuation payload, the
  * absolute deadline, and an optional dispatch payload — its presence makes the computation
  * retryable.
+ *
+ * @param kind the computation kind
+ * @param continuationPayload opaque bytes describing what should receive the outcome
+ * @param deadline the absolute deadline for the first attempt
+ * @param dispatchPayload opaque bytes replayed on every redispatch, or null for a non-retryable
+ *     computation
  */
 public record ComputationRequest(
     ComputationKind kind, byte[] continuationPayload, Instant deadline, byte[] dispatchPayload) {
 
+  /**
+   * Requires a kind, an initial continuation, and a deadline; {@code dispatchPayload} stays
+   * nullable because its absence is what makes a computation non-retryable.
+   *
+   * @throws NullPointerException if {@code kind}, {@code continuationPayload}, or {@code deadline}
+   *     is null
+   */
   public ComputationRequest {
     Objects.requireNonNull(kind, "kind must not be null");
     Objects.requireNonNull(continuationPayload, "continuationPayload must not be null");

@@ -43,6 +43,9 @@ import org.jwcarman.continuum.spi.StoredContinuation;
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ValueTypesTest {
 
+  private static final Instant SUBMITTED_AT = Instant.parse("2026-01-01T00:00:00Z");
+  private static final Instant COMPLETED_AT = SUBMITTED_AT.plus(Duration.ofMinutes(5));
+
   @Nested
   class Identifiers {
     @Test
@@ -199,14 +202,18 @@ class ValueTypesTest {
               new ComputationKind("k"),
               continuationId,
               new byte[] {1},
-              Outcome.failure("f"));
+              Outcome.failure("f"),
+              SUBMITTED_AT,
+              COMPLETED_AT);
       var b =
           new CompletionDelivery(
               computationId,
               new ComputationKind("k"),
               continuationId,
               new byte[] {1},
-              Outcome.failure("f"));
+              Outcome.failure("f"),
+              SUBMITTED_AT,
+              COMPLETED_AT);
       assertThat(a).isEqualTo(b).hasSameHashCodeAs(b);
       assertThat(a.toString()).contains(computationId.value().toString());
     }
@@ -232,7 +239,7 @@ class ValueTypesTest {
                   ComputationId.random(),
                   base.kind(),
                   base.status(),
-                  base.createdAt(),
+                  base.submittedAt(),
                   base.deadline(),
                   base.dispatchPayload(),
                   base.attemptCount(),
@@ -242,7 +249,7 @@ class ValueTypesTest {
                   base.id(),
                   new ComputationKind("other"),
                   base.status(),
-                  base.createdAt(),
+                  base.submittedAt(),
                   base.deadline(),
                   base.dispatchPayload(),
                   base.attemptCount(),
@@ -252,7 +259,7 @@ class ValueTypesTest {
                   base.id(),
                   base.kind(),
                   ComputationStatus.FAILED,
-                  base.createdAt(),
+                  base.submittedAt(),
                   base.deadline(),
                   base.dispatchPayload(),
                   base.attemptCount(),
@@ -262,7 +269,7 @@ class ValueTypesTest {
                   base.id(),
                   base.kind(),
                   base.status(),
-                  base.createdAt().plusSeconds(1),
+                  base.submittedAt().plusSeconds(1),
                   base.deadline(),
                   base.dispatchPayload(),
                   base.attemptCount(),
@@ -272,7 +279,7 @@ class ValueTypesTest {
                   base.id(),
                   base.kind(),
                   base.status(),
-                  base.createdAt(),
+                  base.submittedAt(),
                   base.deadline().plusSeconds(1),
                   base.dispatchPayload(),
                   base.attemptCount(),
@@ -282,11 +289,22 @@ class ValueTypesTest {
                   base.id(),
                   base.kind(),
                   base.status(),
-                  base.createdAt(),
+                  base.submittedAt(),
                   base.deadline(),
                   base.dispatchPayload(),
                   2,
-                  null));
+                  null))
+          // outcome alone: every other component matches, so nothing short-circuits ahead of it
+          .isNotEqualTo(
+              new Computation(
+                  base.id(),
+                  base.kind(),
+                  base.status(),
+                  base.submittedAt(),
+                  base.deadline(),
+                  base.dispatchPayload(),
+                  base.attemptCount(),
+                  Outcome.failure("f")));
     }
 
     @Test
@@ -312,7 +330,13 @@ class ValueTypesTest {
       var kind = new ComputationKind("k");
       var base =
           new CompletionDelivery(
-              computationId, kind, continuationId, new byte[] {1}, Outcome.failure("f"));
+              computationId,
+              kind,
+              continuationId,
+              new byte[] {1},
+              Outcome.failure("f"),
+              SUBMITTED_AT,
+              COMPLETED_AT);
       Object notADelivery = "not a delivery";
       assertThat(base)
           .isNotEqualTo(notADelivery)
@@ -322,27 +346,78 @@ class ValueTypesTest {
                   kind,
                   continuationId,
                   new byte[] {1},
-                  Outcome.failure("f")))
+                  Outcome.failure("f"),
+                  SUBMITTED_AT,
+                  COMPLETED_AT))
           .isNotEqualTo(
               new CompletionDelivery(
                   computationId,
                   new ComputationKind("o"),
                   continuationId,
                   new byte[] {1},
-                  Outcome.failure("f")))
+                  Outcome.failure("f"),
+                  SUBMITTED_AT,
+                  COMPLETED_AT))
           .isNotEqualTo(
               new CompletionDelivery(
                   computationId,
                   kind,
                   ContinuationId.random(),
                   new byte[] {1},
-                  Outcome.failure("f")))
+                  Outcome.failure("f"),
+                  SUBMITTED_AT,
+                  COMPLETED_AT))
           .isNotEqualTo(
               new CompletionDelivery(
-                  computationId, kind, continuationId, new byte[] {2}, Outcome.failure("f")))
+                  computationId,
+                  kind,
+                  continuationId,
+                  new byte[] {2},
+                  Outcome.failure("f"),
+                  SUBMITTED_AT,
+                  COMPLETED_AT))
           .isNotEqualTo(
               new CompletionDelivery(
-                  computationId, kind, continuationId, new byte[] {1}, Outcome.failure("g")));
+                  computationId,
+                  kind,
+                  continuationId,
+                  new byte[] {1},
+                  Outcome.failure("g"),
+                  SUBMITTED_AT,
+                  COMPLETED_AT))
+          .isNotEqualTo(
+              new CompletionDelivery(
+                  computationId,
+                  kind,
+                  continuationId,
+                  new byte[] {1},
+                  Outcome.failure("f"),
+                  SUBMITTED_AT.minusSeconds(1),
+                  COMPLETED_AT))
+          .isNotEqualTo(
+              new CompletionDelivery(
+                  computationId,
+                  kind,
+                  continuationId,
+                  new byte[] {1},
+                  Outcome.failure("f"),
+                  SUBMITTED_AT,
+                  COMPLETED_AT.plusSeconds(1)));
+    }
+
+    @Test
+    void delivery_elapsed_time_spans_submission_to_completion() {
+      var delivery =
+          new CompletionDelivery(
+              ComputationId.random(),
+              new ComputationKind("k"),
+              ContinuationId.random(),
+              new byte[] {1},
+              Outcome.failure("f"),
+              SUBMITTED_AT,
+              SUBMITTED_AT.plus(Duration.ofMinutes(90)));
+
+      assertThat(delivery.elapsedTime()).isEqualTo(Duration.ofMinutes(90));
     }
 
     @Test

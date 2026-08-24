@@ -19,9 +19,21 @@ import java.util.Arrays;
 import java.util.Objects;
 import org.jwcarman.continuum.api.ContinuationId;
 
-/** A continuation as persisted: its Continuum-assigned identity and opaque payload. */
+/**
+ * A continuation as persisted: its Continuum-assigned identity and opaque payload. Equality is by
+ * payload contents rather than array identity, so a row read back from a repository compares equal
+ * to the one that was stored.
+ *
+ * @param id the Continuum-assigned identity
+ * @param payload opaque bytes describing what should receive the outcome
+ */
 public record StoredContinuation(ContinuationId id, byte[] payload) {
 
+  /**
+   * Requires both components; encode an absent payload as zero bytes rather than null.
+   *
+   * @throws NullPointerException if {@code id} or {@code payload} is null
+   */
   public StoredContinuation {
     Objects.requireNonNull(id, "id must not be null");
     Objects.requireNonNull(payload, "payload must not be null");

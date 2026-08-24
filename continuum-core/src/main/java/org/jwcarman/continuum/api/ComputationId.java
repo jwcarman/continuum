@@ -18,12 +18,27 @@ package org.jwcarman.continuum.api;
 import java.util.Objects;
 import java.util.UUID;
 
-/** The globally unique, opaque identity of a computation — all a producer needs to complete it. */
+/**
+ * The globally unique, opaque identity of a computation — all a producer needs to complete it.
+ *
+ * @param value the underlying identity
+ */
 public record ComputationId(UUID value) {
+
+  /**
+   * Requires an identity.
+   *
+   * @throws NullPointerException if {@code value} is null
+   */
   public ComputationId {
     Objects.requireNonNull(value, "value must not be null");
   }
 
+  /**
+   * A new random identity.
+   *
+   * @return a fresh, globally unique id
+   */
   public static ComputationId random() {
     return new ComputationId(UUID.randomUUID());
   }

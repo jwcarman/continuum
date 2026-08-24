@@ -34,24 +34,99 @@ import org.jwcarman.continuum.api.Outcome;
  */
 public interface ContinuumRepository {
 
+  /**
+   * Atomically persists the computation and its initial continuation — both or neither.
+   *
+   * @param computation the pending computation
+   * @param initial the mandatory first continuation
+   */
   void createComputation(Computation computation, StoredContinuation initial);
 
+  /**
+   * Registers a continuation atomically with respect to completion: persisted if pending, the
+   * memoized outcome if terminal, not-found otherwise.
+   *
+   * @param id the computation
+   * @param continuation the continuation to persist if still pending
+   * @return the atomic outcome
+   */
   RegistrationOutcome registerContinuation(ComputationId id, StoredContinuation continuation);
 
+  /**
+   * The ownership transfer, in one transaction: verify pending, delete the pending record, write
+   * the memoized result, create one outbox delivery per registered continuation, delete the
+   * continuations. First terminalization wins.
+   *
+   * @param id the computation to resolve
+   * @param outcome the terminal outcome
+   * @param completedAt the resolution instant
+   * @return whether this call won, lost, or found nothing
+   */
   CompletionOutcome complete(ComputationId id, Outcome outcome, Instant completedAt);
 
+  /**
+   * Looks up a computation — the pending record, or the memoized terminal view until purged.
+   *
+   * @param id the computation id
+   * @return the computation, or empty
+   */
   Optional<Computation> findComputation(ComputationId id);
 
+  /**
+   * Leases up to {@code limit} available deliveries of the given kind. Claimers must never block
+   * one another; a lapsed lease makes a delivery claimable again.
+   *
+   * @param workerId diagnostic identity recorded on the claim
+   * @param kind the kind to claim from
+   * @param limit the maximum deliveries to lease
+   * @param lease how long the claim holds
+   * @param now the current instant
+   * @return the leased deliveries
+   */
   List<ClaimedDelivery> claimDeliveries(
       String workerId, ComputationKind kind, int limit, Duration lease, Instant now);
 
+  /**
+   * Deletes a processed delivery — the outbox holds active obligations only.
+   *
+   * @param id the delivery
+   */
   void acknowledgeDelivery(DeliveryId id);
 
+  /**
+   * Returns a failed delivery to the pool, incrementing its attempt count.
+   *
+   * @param id the delivery
+   * @param retryAt when it becomes claimable again
+   */
   void releaseDelivery(DeliveryId id, Instant retryAt);
 
+  /**
+   * Pending computations of the kind whose deadline has passed ({@code deadline <= now}).
+   *
+   * @param kind the kind to sweep
+   * @param now the current instant
+   * @param limit the maximum to return
+   * @return overdue pending computations, oldest deadline first
+   */
   List<Computation> findExpired(ComputationKind kind, Instant now, int limit);
 
+  /**
+   * Records a redispatch: new deadline and attempt count, atomically, if still pending.
+   *
+   * @param id the computation
+   * @param newDeadline the extended deadline
+   * @param attemptCount the new total attempt count
+   */
   void extendDeadline(ComputationId id, Instant newDeadline, int attemptCount);
 
+  /**
+   * Deletes up to {@code limit} memoized results of the kind completed before the cutoff.
+   *
+   * @param kind the kind to purge
+   * @param olderThan the completion-time cutoff
+   * @param limit the maximum to delete
+   * @return the number deleted
+   */
   int purgeResults(ComputationKind kind, Instant olderThan, int limit);
 }

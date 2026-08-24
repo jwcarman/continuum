@@ -25,19 +25,58 @@ import java.util.Objects;
  */
 public sealed interface TypedOutcome<R> {
 
+  /**
+   * The producer answered, with the payload decoded by the client's result codec.
+   *
+   * @param value the decoded result
+   * @param <R> the decoded result type
+   */
   record Success<R>(R value) implements TypedOutcome<R> {
+
+    /**
+     * Requires a decoded value; a codec that yields null is a codec bug.
+     *
+     * @throws NullPointerException if {@code value} is null
+     */
     public Success {
       Objects.requireNonNull(value, "value must not be null");
     }
   }
 
+  /**
+   * The producer reported a definite "no". Carries no decoded value — failures are prose, not
+   * results — so it is generic only to sit in the same sealed hierarchy.
+   *
+   * @param message the producer's diagnostic prose
+   * @param <R> the decoded result type
+   */
   record Failure<R>(String message) implements TypedOutcome<R> {
+
+    /**
+     * Requires a message — a failure with no explanation is not worth memoizing.
+     *
+     * @throws NullPointerException if {@code message} is null
+     */
     public Failure {
       Objects.requireNonNull(message, "message must not be null");
     }
   }
 
+  /**
+   * The deadline passed with no answer. Like {@link Failure}, it carries prose rather than a
+   * decoded value.
+   *
+   * @param kind which reap path expired the computation
+   * @param message diagnostic prose describing the lapse
+   * @param <R> the decoded result type
+   */
   record Expired<R>(ExpiryKind kind, String message) implements TypedOutcome<R> {
+
+    /**
+     * Requires both the reap path and an explanation.
+     *
+     * @throws NullPointerException if {@code kind} or {@code message} is null
+     */
     public Expired {
       Objects.requireNonNull(kind, "kind must not be null");
       Objects.requireNonNull(message, "message must not be null");

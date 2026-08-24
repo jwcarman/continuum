@@ -17,8 +17,20 @@ package org.jwcarman.continuum.api;
 
 import java.util.Objects;
 
-/** The named category a computation belongs to — e.g. {@code tool-result}, {@code approval}. */
+/**
+ * The named category a computation belongs to — e.g. {@code tool-result}, {@code approval}.
+ *
+ * @param value the kind's name, non-blank
+ */
 public record ComputationKind(String value) {
+
+  /**
+   * Requires a non-blank name — kinds scope every pumping operation, so an empty one would silently
+   * match nothing.
+   *
+   * @throws IllegalArgumentException if {@code value} is blank
+   * @throws NullPointerException if {@code value} is null
+   */
   public ComputationKind {
     Objects.requireNonNull(value, "value must not be null");
     if (value.isBlank()) {

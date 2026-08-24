@@ -28,19 +28,27 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.continuum.api.ComputationId;
 import org.jwcarman.continuum.api.ComputationKind;
+import org.jwcarman.continuum.api.ExpiryContext;
 import org.jwcarman.continuum.retry.Retry;
 import org.jwcarman.continuum.retry.Retry.RetryResult;
-import org.jwcarman.continuum.retry.RetryContext;
 
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class RetryTest {
 
-  private RetryContext contextWithAttempts(int attemptCount) {
-    return new RetryContext(
+  private static final Instant SUBMITTED_AT = Instant.parse("2026-01-01T00:00:00Z");
+
+  private ExpiryContext contextWithAttempts(int attemptCount) {
+    return contextElapsed(attemptCount, Duration.ofMinutes(6));
+  }
+
+  private ExpiryContext contextElapsed(int attemptCount, Duration elapsed) {
+    return new ExpiryContext(
         ComputationId.random(),
         new ComputationKind("k"),
         attemptCount,
-        Instant.parse("2026-01-01T00:00:00Z"));
+        SUBMITTED_AT,
+        SUBMITTED_AT.plus(Duration.ofMinutes(5)),
+        SUBMITTED_AT.plus(elapsed));
   }
 
   @Nested
@@ -103,6 +111,28 @@ class RetryTest {
       Retry<String> retry = (dispatch, ctx) -> RetryResult.notRetried("circuit open");
       assertThat(retry.onTimeout("work", contextWithAttempts(1)))
           .isEqualTo(RetryResult.notRetried("circuit open"));
+    }
+  }
+
+  @Nested
+  class Elapsed_time {
+    @Test
+    void measures_from_submission_to_the_observed_lapse() {
+      assertThat(contextElapsed(3, Duration.ofDays(2)).elapsedTime()).isEqualTo(Duration.ofDays(2));
+    }
+
+    @Test
+    void supports_a_wall_clock_give_up_rule_that_ignores_attempt_count() {
+      Retry<String> giveUpAfterAWeek =
+          (dispatch, ctx) ->
+              ctx.elapsedTime().compareTo(Duration.ofDays(7)) > 0
+                  ? RetryResult.notRetried("no response within 7 days")
+                  : RetryResult.retried();
+
+      assertThat(giveUpAfterAWeek.onTimeout("work", contextElapsed(500, Duration.ofDays(6))))
+          .isEqualTo(RetryResult.retried());
+      assertThat(giveUpAfterAWeek.onTimeout("work", contextElapsed(2, Duration.ofDays(8))))
+          .isEqualTo(RetryResult.notRetried("no response within 7 days"));
     }
   }
 }

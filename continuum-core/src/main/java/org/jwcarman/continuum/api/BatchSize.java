@@ -15,15 +15,30 @@
  */
 package org.jwcarman.continuum.api;
 
-/** How many items one pump call may process; at least 1. */
+/**
+ * How many items one pump call may process; at least 1.
+ *
+ * @param value the maximum items per pump call, at least 1
+ */
 public record BatchSize(int value) {
 
+  /**
+   * Requires at least one — a batch of zero would make every pump call a no-op.
+   *
+   * @throws IllegalArgumentException if {@code value} is less than 1
+   */
   public BatchSize {
     if (value < 1) {
       throw new IllegalArgumentException("value must be at least 1");
     }
   }
 
+  /**
+   * A batch size.
+   *
+   * @param value the maximum items per pump call, at least 1
+   * @return the batch size
+   */
   public static BatchSize of(int value) {
     return new BatchSize(value);
   }

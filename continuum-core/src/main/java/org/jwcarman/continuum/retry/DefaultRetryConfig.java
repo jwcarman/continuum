@@ -18,13 +18,14 @@ package org.jwcarman.continuum.retry;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.function.BiConsumer;
+import org.jwcarman.continuum.api.ExpiryContext;
 import org.jwcarman.continuum.retry.Retry.RetryResult;
 
 final class DefaultRetryConfig<D> implements RetryConfig<D> {
 
   private Integer maxAttempts;
   private Duration timeout;
-  private BiConsumer<D, RetryContext> handler;
+  private BiConsumer<D, ExpiryContext> handler;
 
   @Override
   public RetryConfig<D> atMost(int attempts) {
@@ -42,7 +43,7 @@ final class DefaultRetryConfig<D> implements RetryConfig<D> {
   }
 
   @Override
-  public RetryConfig<D> handler(BiConsumer<D, RetryContext> handler) {
+  public RetryConfig<D> handler(BiConsumer<D, ExpiryContext> handler) {
     this.handler = Objects.requireNonNull(handler, "handler must not be null");
     return this;
   }
@@ -51,7 +52,7 @@ final class DefaultRetryConfig<D> implements RetryConfig<D> {
     Objects.requireNonNull(handler, "handler must be configured");
     Integer max = maxAttempts;
     Duration configuredTimeout = timeout;
-    BiConsumer<D, RetryContext> configuredHandler = handler;
+    BiConsumer<D, ExpiryContext> configuredHandler = handler;
     return (dispatch, context) -> {
       if (max != null && context.attemptCount() >= max) {
         return RetryResult.notRetried(

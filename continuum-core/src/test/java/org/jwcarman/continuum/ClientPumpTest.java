@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.InstantSource;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -50,6 +51,8 @@ import org.jwcarman.continuum.api.ComputationKind;
 import org.jwcarman.continuum.api.ComputationRequest;
 import org.jwcarman.continuum.api.ComputationStatus;
 import org.jwcarman.continuum.api.ContinuationId;
+import org.jwcarman.continuum.api.Expiry;
+import org.jwcarman.continuum.api.ExpiryContext;
 import org.jwcarman.continuum.api.ExpiryKind;
 import org.jwcarman.continuum.api.Lease;
 import org.jwcarman.continuum.api.Outcome;
@@ -135,7 +138,9 @@ class ClientPumpTest {
                   KIND,
                   ContinuationId.random(),
                   "cont".getBytes(UTF_8),
-                  Outcome.success("r".getBytes(UTF_8))),
+                  Outcome.success("r".getBytes(UTF_8)),
+                  NOW.minusSeconds(120),
+                  NOW),
               0);
       when(repository.claimDeliveries(any(), any(), anyInt(), any(), any()))
           .thenReturn(List.of(delivery));
@@ -165,7 +170,9 @@ class ClientPumpTest {
                   KIND,
                   ContinuationId.random(),
                   "cont".getBytes(UTF_8),
-                  Outcome.failure("producer said no")),
+                  Outcome.failure("producer said no"),
+                  NOW.minusSeconds(120),
+                  NOW),
               0);
       var expired =
           new ClaimedDelivery(
@@ -175,7 +182,9 @@ class ClientPumpTest {
                   KIND,
                   ContinuationId.random(),
                   "cont".getBytes(UTF_8),
-                  Outcome.expired(ExpiryKind.RETRY_DISALLOWED, "deadline passed")),
+                  Outcome.expired(ExpiryKind.RETRY_DISALLOWED, "deadline passed"),
+                  NOW.minusSeconds(120),
+                  NOW),
               0);
       when(repository.claimDeliveries(any(), any(), anyInt(), any(), any()))
           .thenReturn(List.of(failure, expired));
@@ -188,6 +197,124 @@ class ClientPumpTest {
           .containsExactly(
               new TypedOutcome.Failure<>("producer said no"),
               new TypedOutcome.Expired<>(ExpiryKind.RETRY_DISALLOWED, "deadline passed"));
+    }
+  }
+
+  @Nested
+  class Expiring_a_non_retryable_kind {
+
+    private ContinuumClient<String, String> approvals() {
+      return continuum.client(
+          "tool",
+          String.class,
+          String.class,
+          cfg ->
+              cfg.resultCodec(ClientMintingTest.STRINGS)
+                  .continuationCodec(ClientMintingTest.STRINGS)
+                  .deadline(Duration.ofMinutes(5)));
+    }
+
+    @Test
+    void the_unconditional_overload_expires_with_a_human_readable_elapsed_time() {
+      var computation = expired(null, 1);
+      when(repository.findExpired(KIND, NOW, 10)).thenReturn(List.of(computation));
+
+      assertThat(approvals().failExpiredComputations(BatchSize.of(10))).isEqualTo(1);
+
+      verify(repository)
+          .complete(
+              computation.id(),
+              Outcome.expired(ExpiryKind.RETRY_DISALLOWED, "expired after 10 mins"),
+              NOW);
+    }
+
+    @Test
+    void an_extending_policy_pushes_the_deadline_without_touching_the_attempt_count() {
+      var computation = expired(null, 1);
+      when(repository.findExpired(KIND, NOW, 10)).thenReturn(List.of(computation));
+
+      int processed =
+          approvals()
+              .failExpiredComputations(
+                  BatchSize.of(10), ctx -> Expiry.ExpiryResult.extended(Duration.ofDays(1)));
+
+      assertThat(processed).isEqualTo(1);
+      verify(repository).extendDeadline(computation.id(), NOW.plus(Duration.ofDays(1)), 1);
+      verify(repository, never()).complete(any(), any(), any());
+    }
+
+    @Test
+    void the_default_extension_uses_the_client_deadline() {
+      var computation = expired(null, 1);
+      when(repository.findExpired(KIND, NOW, 10)).thenReturn(List.of(computation));
+
+      approvals().failExpiredComputations(BatchSize.of(10), ctx -> Expiry.ExpiryResult.extended());
+
+      verify(repository).extendDeadline(computation.id(), NOW.plus(Duration.ofMinutes(5)), 1);
+    }
+
+    @Test
+    void an_expiring_policy_terminalizes_as_disallowed_with_its_reason() {
+      var computation = expired(null, 1);
+      when(repository.findExpired(KIND, NOW, 10)).thenReturn(List.of(computation));
+
+      approvals()
+          .failExpiredComputations(
+              BatchSize.of(10), ctx -> Expiry.ExpiryResult.expired("no response within 7 days"));
+
+      verify(repository)
+          .complete(
+              computation.id(),
+              Outcome.expired(ExpiryKind.RETRY_DISALLOWED, "no response within 7 days"),
+              NOW);
+    }
+
+    @Test
+    void the_policy_sees_elapsed_time_measured_on_the_instant_source() {
+      var computation = expired(null, 1);
+      when(repository.findExpired(KIND, NOW, 10)).thenReturn(List.of(computation));
+
+      var seen = new ArrayList<ExpiryContext>();
+      approvals()
+          .failExpiredComputations(
+              BatchSize.of(10),
+              ctx -> {
+                seen.add(ctx);
+                return Expiry.ExpiryResult.extended();
+              });
+
+      assertThat(seen)
+          .singleElement()
+          .satisfies(
+              ctx -> {
+                assertThat(ctx.submittedAt()).isEqualTo(computation.submittedAt());
+                assertThat(ctx.observedAt()).isEqualTo(NOW);
+                assertThat(ctx.elapsedTime()).isEqualTo(Duration.ofMinutes(10));
+              });
+    }
+
+    @Test
+    void a_throwing_policy_leaves_the_computation_untouched() {
+      var computation = expired(null, 1);
+      when(repository.findExpired(KIND, NOW, 10)).thenReturn(List.of(computation));
+
+      int processed =
+          approvals()
+              .failExpiredComputations(
+                  BatchSize.of(10),
+                  ctx -> {
+                    throw new IllegalStateException("boom");
+                  });
+
+      assertThat(processed).isZero();
+      verify(repository, never()).extendDeadline(any(), any(), anyInt());
+      verify(repository, never()).complete(any(), any(), any());
+    }
+
+    @Test
+    void the_policy_is_required() {
+      assertThatNullPointerException()
+          .isThrownBy(() -> approvals().failExpiredComputations(BatchSize.of(10), null));
     }
   }
 
@@ -217,6 +344,30 @@ class ClientPumpTest {
     }
 
     @Test
+    void retry_sees_the_original_submission_time_not_the_extended_deadline() {
+      var computation = expired("d".getBytes(UTF_8), 2);
+      when(repository.findExpired(KIND, NOW, 10)).thenReturn(List.of(computation));
+
+      var seen = new ArrayList<ExpiryContext>();
+      retryable()
+          .retryExpiredComputations(
+              BatchSize.of(10),
+              (dispatch, ctx) -> {
+                seen.add(ctx);
+                return Retry.RetryResult.retried();
+              });
+
+      assertThat(seen)
+          .singleElement()
+          .satisfies(
+              ctx -> {
+                assertThat(ctx.submittedAt()).isEqualTo(computation.submittedAt());
+                assertThat(ctx.deadline()).isEqualTo(computation.deadline());
+                assertThat(ctx.attemptCount()).isEqualTo(2);
+              });
+    }
+
+    @Test
     void not_retried_expires_with_retry_exhausted_and_the_reason() {
       var computation = expired("d".getBytes(UTF_8), 3);
       when(repository.findExpired(KIND, NOW, 10)).thenReturn(List.of(computation));
@@ -241,8 +392,7 @@ class ClientPumpTest {
       verify(repository)
           .complete(
               computation.id(),
-              Outcome.expired(
-                  ExpiryKind.RETRY_DISALLOWED, "deadline " + computation.deadline() + " passed"),
+              Outcome.expired(ExpiryKind.RETRY_DISALLOWED, "expired after 10 mins"),
               NOW);
     }
 
@@ -485,14 +635,12 @@ class ClientPumpTest {
       verify(repository)
           .complete(
               first.id(),
-              Outcome.expired(
-                  ExpiryKind.RETRY_DISALLOWED, "deadline " + first.deadline() + " passed"),
+              Outcome.expired(ExpiryKind.RETRY_DISALLOWED, "expired after 10 mins"),
               NOW);
       verify(repository)
           .complete(
               second.id(),
-              Outcome.expired(
-                  ExpiryKind.RETRY_DISALLOWED, "deadline " + second.deadline() + " passed"),
+              Outcome.expired(ExpiryKind.RETRY_DISALLOWED, "expired after 10 mins"),
               NOW);
     }
 
@@ -606,7 +754,9 @@ class ClientPumpTest {
               KIND,
               ContinuationId.random(),
               "c".getBytes(UTF_8),
-              Outcome.failure("f"));
+              Outcome.failure("f"),
+              NOW.minusSeconds(120),
+              NOW);
       assertThatNullPointerException().isThrownBy(() -> new ClaimedDelivery(null, delivery, 0));
       assertThatNullPointerException()
           .isThrownBy(() -> new ClaimedDelivery(DeliveryId.random(), null, 0));

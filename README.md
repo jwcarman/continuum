@@ -35,7 +35,7 @@ the work receives the `ComputationId` and eventually reports the outcome.
 <dependency>
     <groupId>org.jwcarman.continuum</groupId>
     <artifactId>continuum-core</artifactId>
-    <version>${continuum.version}</version>
+    <version>0.1.0</version>
 </dependency>
 ```
 
@@ -50,7 +50,7 @@ a separate dependency:
 <dependency>
     <groupId>org.jwcarman.codec</groupId>
     <artifactId>codec-jackson</artifactId>
-    <version>${codec.version}</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 

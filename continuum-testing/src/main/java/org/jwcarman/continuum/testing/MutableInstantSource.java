@@ -25,6 +25,12 @@ public final class MutableInstantSource implements InstantSource {
 
   private volatile Instant current;
 
+  /**
+   * Starts the clock at a fixed instant. Time moves only when a test calls {@link
+   * #advance(Duration)} or {@link #set(Instant)}.
+   *
+   * @param start the initial instant
+   */
   public MutableInstantSource(Instant start) {
     this.current = Objects.requireNonNull(start, "start must not be null");
   }
@@ -34,10 +40,20 @@ public final class MutableInstantSource implements InstantSource {
     return current;
   }
 
+  /**
+   * Moves time forward.
+   *
+   * @param duration how far to advance
+   */
   public void advance(Duration duration) {
     current = current.plus(duration);
   }
 
+  /**
+   * Sets the current instant.
+   *
+   * @param instant the new now
+   */
   public void set(Instant instant) {
     current = Objects.requireNonNull(instant, "instant must not be null");
   }

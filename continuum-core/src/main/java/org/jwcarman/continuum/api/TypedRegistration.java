@@ -25,13 +25,39 @@ import java.util.Objects;
  */
 public sealed interface TypedRegistration<R> {
 
+  /**
+   * The computation was still pending, so the continuation is now durable and a delivery is
+   * guaranteed to follow.
+   *
+   * @param continuationId the Continuum-assigned identity of the registered continuation
+   * @param <R> the decoded result type
+   */
   record Registered<R>(ContinuationId continuationId) implements TypedRegistration<R> {
+
+    /**
+     * Requires the assigned identity — it is the caller's deduplication key.
+     *
+     * @throws NullPointerException if {@code continuationId} is null
+     */
     public Registered {
       Objects.requireNonNull(continuationId, "continuationId must not be null");
     }
   }
 
+  /**
+   * The computation had already resolved, so the memoized outcome comes back decoded and nothing
+   * was persisted — no continuation exists and no delivery will follow.
+   *
+   * @param outcome the memoized terminal outcome, decoded
+   * @param <R> the decoded result type
+   */
   record Resolved<R>(TypedOutcome<R> outcome) implements TypedRegistration<R> {
+
+    /**
+     * Requires the memoized outcome — this arm exists to carry it.
+     *
+     * @throws NullPointerException if {@code outcome} is null
+     */
     public Resolved {
       Objects.requireNonNull(outcome, "outcome must not be null");
     }

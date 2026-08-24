@@ -1,10 +1,16 @@
+-- Naming convention:
+--   submitted_at  when the computation was submitted (a domain fact, carried onto
+--                 every row describing that computation)
+--   completed_at  when the computation reached its terminal outcome
+--   created_at    when THIS row was written (bookkeeping only, never a domain fact)
+
 CREATE TABLE IF NOT EXISTS continuum_computation (
     id UUID PRIMARY KEY,
     kind VARCHAR(200) NOT NULL,
     deadline_at TIMESTAMPTZ NOT NULL,
     dispatch_payload BYTEA,
     attempt_count INT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
+    submitted_at TIMESTAMPTZ NOT NULL,
     last_updated_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_continuum_computation_kind_deadline
@@ -28,7 +34,7 @@ CREATE TABLE IF NOT EXISTS continuum_result (
     message TEXT,
     deadline_at TIMESTAMPTZ NOT NULL,
     attempt_count INT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
+    submitted_at TIMESTAMPTZ NOT NULL,
     completed_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_continuum_result_kind_completed
@@ -48,7 +54,9 @@ CREATE TABLE IF NOT EXISTS continuum_outbox (
     claimed_by VARCHAR(200),
     claimed_until TIMESTAMPTZ,
     attempt_count INT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL
+    created_at TIMESTAMPTZ NOT NULL,
+    submitted_at TIMESTAMPTZ NOT NULL,
+    completed_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_continuum_outbox_kind_available
     ON continuum_outbox (kind, available_at);

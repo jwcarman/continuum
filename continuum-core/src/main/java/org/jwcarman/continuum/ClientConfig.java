@@ -22,14 +22,42 @@ import org.jwcarman.codec.spi.CodecFactory;
 /**
  * Creation-time configuration for a non-retryable client: codecs and the per-attempt deadline.
  * Fluent, no {@code build()} — the minting factory applies the customizer and builds privately.
+ *
+ * @param <R> the result type
+ * @param <C> the continuation type
  */
 public interface ClientConfig<R, C> {
 
+  /**
+   * The factory used to resolve any payload codec not set explicitly.
+   *
+   * @param factory the codec factory
+   * @return this config
+   */
   ClientConfig<R, C> codecs(CodecFactory factory);
 
+  /**
+   * Explicit result codec, overriding factory resolution.
+   *
+   * @param codec the result codec
+   * @return this config
+   */
   ClientConfig<R, C> resultCodec(Codec<R> codec);
 
+  /**
+   * Explicit continuation codec, overriding factory resolution.
+   *
+   * @param codec the continuation codec
+   * @return this config
+   */
   ClientConfig<R, C> continuationCodec(Codec<C> codec);
 
+  /**
+   * The per-attempt timeout: {@code create} computes {@code now + deadline}, and retries extend by
+   * it unless the retry says otherwise. Required.
+   *
+   * @param deadline the per-attempt timeout
+   * @return this config
+   */
   ClientConfig<R, C> deadline(Duration deadline);
 }

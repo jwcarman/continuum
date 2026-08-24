@@ -15,9 +15,18 @@
  */
 package org.jwcarman.continuum.retry;
 
+/**
+ * Fills in a {@link RetryConfig} — the only thing a customizer ever does.
+ *
+ * @param <D> the dispatch type
+ */
 @FunctionalInterface
-/** Fills in a {@link RetryConfig} — the only thing a customizer ever does. */
 public interface RetryCustomizer<D> {
 
+  /**
+   * Applies this customizer's settings to the given config.
+   *
+   * @param config the mutable config to populate
+   */
   void customize(RetryConfig<D> config);
 }

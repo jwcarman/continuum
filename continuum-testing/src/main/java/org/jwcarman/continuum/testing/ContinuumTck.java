@@ -50,6 +50,7 @@ import org.jwcarman.continuum.api.ComputationKind;
 import org.jwcarman.continuum.api.ComputationNotFoundException;
 import org.jwcarman.continuum.api.ComputationRequest;
 import org.jwcarman.continuum.api.ComputationStatus;
+import org.jwcarman.continuum.api.Expiry.ExpiryResult;
 import org.jwcarman.continuum.api.ExpiryKind;
 import org.jwcarman.continuum.api.Lease;
 import org.jwcarman.continuum.api.Outcome;
@@ -61,23 +62,47 @@ import org.jwcarman.continuum.spi.ClaimedDelivery;
 import org.jwcarman.continuum.spi.CompletionOutcome;
 import org.jwcarman.continuum.spi.ContinuumRepository;
 
-@DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 /**
  * The provider certification battery. Extend, supply {@link #createRepository()}, and inherit
  * lifecycle semantics, the registration-vs-completion and complete-vs-complete races, competing
  * consumers, lease expiry, late registration, expiry outcomes, and purge behavior.
  */
+@DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 public abstract class ContinuumTck {
 
+  /**
+   * The kind every computation in the battery is filed under — providers that partition storage by
+   * kind see all TCK traffic on this one.
+   */
   protected static final ComputationKind KIND = new ComputationKind("tck");
+
+  /** The lease the battery takes when claiming deliveries; expiry tests advance past it. */
   protected static final Duration LEASE = Duration.ofSeconds(30);
 
+  /** The clock the battery drives; advance it rather than sleeping to reach a deadline. */
   protected MutableInstantSource instants;
+
+  /** The provider's repository under certification, rebuilt before each test. */
   protected ContinuumRepository repository;
+
+  /** A {@link DefaultContinuum} over {@link #repository} and {@link #instants}. */
   protected Continuum continuum;
 
+  /**
+   * Subclasses are instantiated by JUnit, once per test method; per-test state belongs in {@link
+   * #createRepository()} or an {@code @BeforeEach}, not here.
+   */
+  protected ContinuumTck() {}
+
+  /**
+   * Builds the repository to certify. Called before every test, and must hand back storage with no
+   * computations, continuations, or deliveries left over from a prior test.
+   *
+   * @return a fresh, empty repository under certification
+   */
   protected abstract ContinuumRepository createRepository();
 
+  /** Rebuilds the clock, the repository, and the {@link Continuum} facade before each test. */
   @BeforeEach
   protected void setUpTck() {
     instants = new MutableInstantSource(Instant.parse("2026-01-01T00:00:00Z"));
@@ -85,6 +110,13 @@ public abstract class ContinuumTck {
     continuum = new DefaultContinuum(repository, instants);
   }
 
+  /**
+   * A request of {@link #KIND} carrying {@code "cont"} as its initial continuation and a deadline
+   * five minutes past the current instant — advance {@link #instants} past that to make it expire.
+   *
+   * @param dispatchPayload the payload a retry pump would re-dispatch, or {@code null} for none
+   * @return the request
+   */
   protected ComputationRequest request(byte[] dispatchPayload) {
     return new ComputationRequest(
         KIND,
@@ -93,11 +125,24 @@ public abstract class ContinuumTck {
         dispatchPayload);
   }
 
+  /**
+   * Claims every ready delivery of {@link #KIND} for one worker under {@link #LEASE}. The claim is
+   * not acknowledged, so a second worker sees nothing until the lease lapses.
+   *
+   * @param workerId the claiming worker's identity
+   * @return the deliveries now leased to that worker
+   */
   protected List<ClaimedDelivery> claimAll(String workerId) {
     return repository.claimDeliveries(workerId, KIND, 100, LEASE, instants.instant());
   }
 
-  /** Runs both tasks as concurrently as a latch can make them; rethrows any task failure. */
+  /**
+   * Runs both tasks as concurrently as a latch can make them; rethrows any task failure. Neither
+   * argument is privileged — which one wins a race is exactly what the race tests probe.
+   *
+   * @param first one contender
+   * @param second the other contender
+   */
   protected static void concurrently(Runnable first, Runnable second) {
     CountDownLatch start = new CountDownLatch(1);
     Callable<Void> a =
@@ -313,6 +358,21 @@ public abstract class ContinuumTck {
 
   @Nested
   class Claiming {
+    @Test
+    void deliveries_carry_the_computation_submission_and_completion_times() {
+      var submittedAt = instants.instant();
+      var computation = continuum.create(request(null));
+      instants.advance(Duration.ofMinutes(3));
+      var completedAt = instants.instant();
+      continuum.complete(computation.id(), Outcome.success("r".getBytes(UTF_8)));
+
+      var delivery = claimAll("w1").getFirst().delivery();
+
+      assertThat(delivery.submittedAt()).isEqualTo(submittedAt);
+      assertThat(delivery.completedAt()).isEqualTo(completedAt);
+      assertThat(delivery.elapsedTime()).isEqualTo(Duration.ofMinutes(3));
+    }
+
     @Test
     void competing_consumers_claim_disjoint_deliveries() {
       continuum.complete(
@@ -550,9 +610,37 @@ public abstract class ContinuumTck {
       var found = continuum.find(computation.id()).orElseThrow();
       assertThat(found.status()).isEqualTo(ComputationStatus.EXPIRED);
       assertThat(found.outcome())
-          .isEqualTo(
-              Outcome.expired(
-                  ExpiryKind.RETRY_DISALLOWED, "deadline " + found.deadline() + " passed"));
+          .isEqualTo(Outcome.expired(ExpiryKind.RETRY_DISALLOWED, "expired after 6 mins"));
+    }
+
+    @Test
+    void fail_pump_policy_can_extend_the_wait_instead_of_ending_it() {
+      var client = nonRetryable();
+      var computation = client.create("route-me");
+      instants.advance(Duration.ofMinutes(6));
+
+      assertThat(
+              client.failExpiredComputations(
+                  BatchSize.of(10),
+                  ctx ->
+                      ctx.elapsedTime().compareTo(Duration.ofHours(1)) > 0
+                          ? ExpiryResult.expired("waited long enough")
+                          : ExpiryResult.extended(Duration.ofMinutes(30))))
+          .isEqualTo(1);
+
+      var stillPending = continuum.find(computation.id()).orElseThrow();
+      assertThat(stillPending.status()).isEqualTo(ComputationStatus.PENDING);
+      assertThat(stillPending.deadline())
+          .isEqualTo(instants.instant().plus(Duration.ofMinutes(30)));
+      assertThat(stillPending.attemptCount()).isEqualTo(1);
+
+      instants.advance(Duration.ofHours(2));
+      assertThat(
+              client.failExpiredComputations(
+                  BatchSize.of(10), ctx -> ExpiryResult.expired("waited long enough")))
+          .isEqualTo(1);
+      assertThat(continuum.find(computation.id()).orElseThrow().outcome())
+          .isEqualTo(Outcome.expired(ExpiryKind.RETRY_DISALLOWED, "waited long enough"));
     }
 
     @Test

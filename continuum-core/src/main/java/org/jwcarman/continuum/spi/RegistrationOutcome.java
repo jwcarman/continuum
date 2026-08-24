@@ -24,13 +24,35 @@ import org.jwcarman.continuum.api.Outcome;
  */
 public sealed interface RegistrationOutcome {
 
+  /**
+   * The computation was still pending, so the continuation was persisted and a delivery is
+   * guaranteed. Carries no identity: the caller already knows the id it asked the repository to
+   * store.
+   */
   record Registered() implements RegistrationOutcome {}
 
+  /**
+   * The computation had already resolved, so nothing was persisted and the memoized outcome comes
+   * back instead.
+   *
+   * @param outcome the memoized terminal outcome
+   */
   record Resolved(Outcome outcome) implements RegistrationOutcome {
+
+    /**
+     * Requires the memoized outcome — this arm exists to carry it.
+     *
+     * @throws NullPointerException if {@code outcome} is null
+     */
     public Resolved {
       Objects.requireNonNull(outcome, "outcome must not be null");
     }
   }
 
+  /**
+   * No such computation — it never existed, or its result was purged. This arm is what the API
+   * layer turns into a {@code ComputationNotFoundException}; the SPI reports it as data so
+   * providers need not throw.
+   */
   record NotFound() implements RegistrationOutcome {}
 }

@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.StringJoiner;
 import java.util.function.BiConsumer;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.continuum.api.Backoff;
@@ -48,6 +49,30 @@ final class ClientSupport<R, C> {
 
   private static final Logger log = LoggerFactory.getLogger(ClientSupport.class);
   private static final String BATCH_SIZE_NULL_MESSAGE = "batchSize must not be null";
+
+  /**
+   * Renders a duration the way an operator reads it — "1 day, 5 hours, 6 mins, 23 secs" — for the
+   * diagnostic prose on an expired outcome. Zero-valued parts are omitted, so a short wait reads
+   * "45 secs" rather than "0 days, 0 hours, 0 mins, 45 secs". The JDK has no such formatter;
+   * ISO-8601 ({@code PT29H6M23S}) is precise but not what belongs in a log line or a result row.
+   */
+  static String describeElapsed(Duration elapsed) {
+    if (elapsed.isNegative() || elapsed.isZero()) {
+      return "0 secs";
+    }
+    StringJoiner parts = new StringJoiner(", ");
+    appendPart(parts, elapsed.toDaysPart(), "day");
+    appendPart(parts, elapsed.toHoursPart(), "hour");
+    appendPart(parts, elapsed.toMinutesPart(), "min");
+    appendPart(parts, elapsed.toSecondsPart(), "sec");
+    return parts.length() == 0 ? "less than a second" : parts.toString();
+  }
+
+  private static void appendPart(StringJoiner parts, long value, String unit) {
+    if (value > 0) {
+      parts.add(value + " " + unit + (value == 1 ? "" : "s"));
+    }
+  }
 
   private final Continuum continuum;
   private final ComputationKind kind;

@@ -56,6 +56,12 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
 
   private final DataSource dataSource;
 
+  /**
+   * Binds this repository to a data source. No schema is created or validated here — run {@code
+   * continuum-postgresql.sql} before first use.
+   *
+   * @param dataSource the PostgreSQL data source; the application owns pooling and schema
+   */
   public JdbcContinuumRepository(DataSource dataSource) {
     this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
   }
@@ -91,7 +97,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
     inTransaction(
         connection -> {
           insertComputationRow(connection, computation);
-          insertContinuation(connection, computation.id(), initial, computation.createdAt());
+          insertContinuation(connection, computation.id(), initial, computation.submittedAt());
           return null;
         });
   }
@@ -101,15 +107,15 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
     try (PreparedStatement insert =
         connection.prepareStatement(
             "INSERT INTO continuum_computation "
-                + "(id, kind, deadline_at, dispatch_payload, attempt_count, created_at, last_updated_at) "
+                + "(id, kind, deadline_at, dispatch_payload, attempt_count, submitted_at, last_updated_at) "
                 + "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
       insert.setObject(1, computation.id().value());
       insert.setString(2, computation.kind().value());
       insert.setTimestamp(3, Timestamp.from(computation.deadline()));
       insert.setBytes(4, computation.dispatchPayload());
       insert.setInt(5, computation.attemptCount());
-      insert.setTimestamp(6, Timestamp.from(computation.createdAt()));
-      insert.setTimestamp(7, Timestamp.from(computation.createdAt()));
+      insert.setTimestamp(6, Timestamp.from(computation.submittedAt()));
+      insert.setTimestamp(7, Timestamp.from(computation.submittedAt()));
       insert.executeUpdate();
     }
   }
@@ -118,7 +124,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
       Connection connection,
       ComputationId computationId,
       StoredContinuation continuation,
-      Instant createdAt)
+      Instant submittedAt)
       throws SQLException {
     try (PreparedStatement insert =
         connection.prepareStatement(
@@ -127,7 +133,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
       insert.setObject(1, continuation.id().value());
       insert.setObject(2, computationId.value());
       insert.setBytes(3, continuation.payload());
-      insert.setTimestamp(4, Timestamp.from(createdAt));
+      insert.setTimestamp(4, Timestamp.from(submittedAt));
       insert.executeUpdate();
     }
   }
@@ -139,7 +145,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
         connection -> {
           Computation pending = lockAndReadPending(connection, id);
           if (pending != null) {
-            insertContinuation(connection, id, continuation, pending.createdAt());
+            insertContinuation(connection, id, continuation, pending.submittedAt());
             return new RegistrationOutcome.Registered();
           }
           return readResultOutcome(connection, id)
@@ -162,14 +168,14 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
               connection.prepareStatement(
                   "INSERT INTO continuum_result "
                       + "(computation_id, kind, outcome_type, outcome_payload, expiry_kind, message, "
-                      + " deadline_at, attempt_count, created_at, completed_at) "
+                      + " deadline_at, attempt_count, submitted_at, completed_at) "
                       + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             insert.setObject(1, id.value());
             insert.setString(2, pending.kind().value());
             setOutcomeColumns(insert, 3, outcome);
             insert.setTimestamp(7, Timestamp.from(pending.deadline()));
             insert.setInt(8, pending.attemptCount());
-            insert.setTimestamp(9, Timestamp.from(pending.createdAt()));
+            insert.setTimestamp(9, Timestamp.from(pending.submittedAt()));
             insert.setTimestamp(10, Timestamp.from(completedAt));
             insert.executeUpdate();
           }
@@ -178,13 +184,16 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                   "INSERT INTO continuum_outbox "
                       + "(id, computation_id, continuation_id, kind, continuation_payload, "
                       + " outcome_type, outcome_payload, expiry_kind, message, available_at, "
-                      + " attempt_count, created_at) "
-                      + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)")) {
+                      + " attempt_count, created_at, submitted_at, "
+                      + " completed_at) "
+                      + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)")) {
             insert.setObject(2, id.value());
             insert.setString(4, pending.kind().value());
             setOutcomeColumns(insert, 6, outcome);
             insert.setTimestamp(10, Timestamp.from(completedAt));
             insert.setTimestamp(11, Timestamp.from(completedAt));
+            insert.setTimestamp(12, Timestamp.from(pending.submittedAt()));
+            insert.setTimestamp(13, Timestamp.from(completedAt));
             for (StoredContinuation continuation : readContinuations(connection, id)) {
               insert.setObject(1, DeliveryId.random().value());
               insert.setObject(3, continuation.id().value());
@@ -212,7 +221,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
       throws SQLException {
     try (PreparedStatement select =
         connection.prepareStatement(
-            "SELECT kind, deadline_at, dispatch_payload, attempt_count, created_at "
+            "SELECT kind, deadline_at, dispatch_payload, attempt_count, submitted_at "
                 + "FROM continuum_computation WHERE id = ? FOR UPDATE")) {
       select.setObject(1, id.value());
       try (ResultSet row = select.executeQuery()) {
@@ -230,7 +239,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
         id,
         new ComputationKind(row.getString("kind")),
         ComputationStatus.PENDING,
-        row.getTimestamp("created_at").toInstant(),
+        row.getTimestamp("submitted_at").toInstant(),
         row.getTimestamp("deadline_at").toInstant(),
         row.getBytes("dispatch_payload"),
         row.getInt(ATTEMPT_COUNT_COLUMN),
@@ -312,7 +321,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
         connection -> {
           try (PreparedStatement select =
               connection.prepareStatement(
-                  "SELECT kind, deadline_at, dispatch_payload, attempt_count, created_at "
+                  "SELECT kind, deadline_at, dispatch_payload, attempt_count, submitted_at "
                       + "FROM continuum_computation WHERE id = ?")) {
             select.setObject(1, id.value());
             try (ResultSet row = select.executeQuery()) {
@@ -324,7 +333,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
           try (PreparedStatement select =
               connection.prepareStatement(
                   "SELECT kind, outcome_type, outcome_payload, expiry_kind, message, "
-                      + " deadline_at, attempt_count, created_at "
+                      + " deadline_at, attempt_count, submitted_at "
                       + "FROM continuum_result WHERE computation_id = ?")) {
             select.setObject(1, id.value());
             try (ResultSet row = select.executeQuery()) {
@@ -337,7 +346,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                       id,
                       new ComputationKind(row.getString("kind")),
                       Outcome.statusOf(outcome),
-                      row.getTimestamp("created_at").toInstant(),
+                      row.getTimestamp("submitted_at").toInstant(),
                       row.getTimestamp("deadline_at").toInstant(),
                       null,
                       row.getInt(ATTEMPT_COUNT_COLUMN),
@@ -356,7 +365,8 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
           try (PreparedStatement select =
               connection.prepareStatement(
                   "SELECT id, computation_id, continuation_id, continuation_payload, "
-                      + " outcome_type, outcome_payload, expiry_kind, message, attempt_count "
+                      + " outcome_type, outcome_payload, expiry_kind, message, attempt_count, "
+                      + " submitted_at, completed_at "
                       + "FROM continuum_outbox "
                       + "WHERE kind = ? AND available_at <= ? "
                       + " AND (claimed_until IS NULL OR claimed_until <= ?) "
@@ -375,7 +385,9 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                             kind,
                             new ContinuationId(row.getObject("continuation_id", UUID.class)),
                             row.getBytes("continuation_payload"),
-                            readOutcome(row)),
+                            readOutcome(row),
+                            row.getTimestamp("submitted_at").toInstant(),
+                            row.getTimestamp("completed_at").toInstant()),
                         row.getInt(ATTEMPT_COUNT_COLUMN)));
               }
             }
@@ -431,7 +443,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
           List<Computation> expired = new ArrayList<>();
           try (PreparedStatement select =
               connection.prepareStatement(
-                  "SELECT id, kind, deadline_at, dispatch_payload, attempt_count, created_at "
+                  "SELECT id, kind, deadline_at, dispatch_payload, attempt_count, submitted_at "
                       + "FROM continuum_computation WHERE kind = ? AND deadline_at <= ? "
                       + "ORDER BY deadline_at LIMIT ?")) {
             select.setString(1, kind.value());

@@ -6,32 +6,35 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.0] - 2026-08-24
 
-### Added
+Initial release: the byte[] `Continuum` core, typed clients
+(`ContinuumClient` / `RetryableContinuumClient`), application-pumped
+delivery/expiry/purge, in-memory and PostgreSQL providers, a provider TCK,
+and a Spring Boot starter.
 
-- Core API: `Continuum`/`DefaultContinuum`, three-arm `Outcome`
-  (`Success`/`Failure`/`Expired`), derived `ComputationStatus`, opaque byte[]
-  payloads end to end.
-- Typed clients: `ContinuumClient<R, C>` (non-retryable kinds) and
-  `RetryableContinuumClient<R, C, D>` (retryable kinds) minted via
-  `continuum.client(...)` customizers, with pluggable serialization through
-  `org.jwcarman.codec`.
-- Application-pumped batch methods: `deliverResults`,
-  `retryExpiredComputations` / `failExpiredComputations`,
-  `purgeExpiredResults`; `Retry.of(...)` declarative retry customizer.
-- Persistence SPI (`ContinuumRepository`) with presence-means-pending
-  semantics and kind-scoped pumping operations.
-- `continuum-memory`: in-memory provider for tests and embedded use.
-- `continuum-jdbc`: PostgreSQL provider (`FOR UPDATE SKIP LOCKED` claiming,
-  atomic ownership-transfer completion).
-- `continuum-testing`: TCK exercising the full concurrency battery, run by
-  both providers.
-- Value-typed pump parameters (`BatchSize`, `Lease`, `Backoff`, `ResultTtl`)
-  with validated construction and unit factories.
-- `continuum-bom`.
-- `continuum-spring-boot-starter` + `continuum-autoconfigure`: auto-configures
-  `JdbcContinuumRepository` (when `continuum-jdbc` and a `DataSource` are
-  present) or falls back to the in-memory repository with a warning, and wires
-  a `Continuum` over it (honoring app-defined `ContinuumRepository` /
-  `InstantSource` beans).
+Deadlines are mandatory — that is what makes "one computation, one *eventual*
+outcome" true. An open-ended wait is expressed as a decision taken at each
+lapse rather than as an absent deadline, so the deadline stays a dead-man's
+switch and giving up is explicit and carries a reason:
+
+- `ExpiryContext` carries the computation's `submittedAt` and the pump's
+  `observedAt`, with `elapsedTime()` measured on Continuum's `InstantSource`.
+  A wall-clock give-up rule ("stop waiting seven days after submission") needs
+  no arithmetic over attempt counts, which is wrong once attempts carry
+  differing timeouts. Both `Retry` and `Expiry` receive it.
+- `ContinuumClient.failExpiredComputations(BatchSize, Expiry)` lets a
+  **non-retryable** kind keep waiting or give up at each lapse — without
+  inventing a dispatch payload it must never use, which would trade the
+  compile-time non-retryability guarantee for a convention.
+- `CompletionDelivery` carries `submittedAt`, `completedAt`, and
+  `elapsedTime()`, denormalized onto the outbox row so a consumer can record
+  end-to-end duration when the outcome arrives, even after the memoized result
+  is purged.
+
+Timestamp vocabulary is uniform: `submitted_at` is when the computation was
+submitted, `completed_at` when it reached a terminal outcome, and `created_at`
+means only "this row was written".
+
+See the [documentation](https://jwcarman.github.io/continuum/) for the full
+tour.
 
 [0.1.0]: https://github.com/jwcarman/continuum/releases/tag/0.1.0

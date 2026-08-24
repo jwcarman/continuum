@@ -16,6 +16,7 @@
 package org.jwcarman.continuum;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 import org.jwcarman.codec.spi.Codec;
@@ -25,6 +26,7 @@ import org.jwcarman.continuum.api.CompletionResult;
 import org.jwcarman.continuum.api.Computation;
 import org.jwcarman.continuum.api.ComputationId;
 import org.jwcarman.continuum.api.ComputationKind;
+import org.jwcarman.continuum.api.ExpiryContext;
 import org.jwcarman.continuum.api.ExpiryKind;
 import org.jwcarman.continuum.api.Lease;
 import org.jwcarman.continuum.api.ResultTtl;
@@ -32,7 +34,6 @@ import org.jwcarman.continuum.api.TypedOutcome;
 import org.jwcarman.continuum.api.TypedRegistration;
 import org.jwcarman.continuum.retry.Retry;
 import org.jwcarman.continuum.retry.Retry.RetryResult;
-import org.jwcarman.continuum.retry.RetryContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,46 +59,120 @@ public final class RetryableContinuumClient<R, C, D> {
     this.dispatchCodec = dispatchCodec;
   }
 
+  /**
+   * Atomically creates a pending computation (deadline = now + the configured deadline) with the
+   * given continuation and dispatch breadcrumb. The dispatch payload is written once and handed
+   * back verbatim on every retry — embed your external idempotency key in it.
+   *
+   * @param continuation what should receive the outcome
+   * @param dispatch how to (re)start the work
+   * @return the pending computation (attempt 1)
+   */
   public Computation create(C continuation, D dispatch) {
     return create(continuation, dispatch, null);
   }
 
+  /**
+   * As {@link #create(Object, Object)} with a per-call deadline.
+   *
+   * @param continuation what should receive the outcome
+   * @param dispatch how to (re)start the work
+   * @param deadlineOverride the per-attempt timeout for this computation
+   * @return the pending computation (attempt 1)
+   */
   public Computation create(C continuation, D dispatch, Duration deadlineOverride) {
     Objects.requireNonNull(dispatch, "dispatch must not be null");
     return support.create(continuation, dispatchCodec.encode(dispatch), deadlineOverride);
   }
 
+  /**
+   * Reports the computation's successful result; first terminalization wins.
+   *
+   * @param id the computation to resolve
+   * @param result the result value, encoded with this client's result codec
+   * @return whether this call won, lost, or found nothing
+   */
   public CompletionResult complete(ComputationId id, R result) {
     return support.complete(id, result);
   }
 
+  /**
+   * Reports that the work itself failed; first terminalization wins.
+   *
+   * @param id the computation to resolve
+   * @param message the producer's words — diagnostic prose, never parsed
+   * @return whether this call won, lost, or found nothing
+   */
   public CompletionResult fail(ComputationId id, String message) {
     return support.fail(id, message);
   }
 
+  /**
+   * Registers interest, atomically against completion: durably registered, or the already-memoized
+   * outcome decoded — never neither.
+   *
+   * @param id the computation to watch
+   * @param continuation what should receive the outcome
+   * @return the registration or the decoded outcome
+   */
   public TypedRegistration<R> register(ComputationId id, C continuation) {
     return support.register(id, continuation);
   }
 
+  /**
+   * Claims up to a batch of this kind's outbox deliveries under the default 30-second lease,
+   * decodes each, and invokes the consumer. Success acknowledges (deletes) the delivery; a consumer
+   * exception releases it with the default 30-second backoff and an incremented attempt count — one
+   * delivery's failure never blocks the others. At-least-once: deduplicate on the continuation id.
+   *
+   * @param batchSize the maximum deliveries to process
+   * @param consumer receives the decoded continuation and typed outcome
+   * @return the number successfully delivered — the drain signal
+   */
   public int deliverResults(BatchSize batchSize, BiConsumer<C, TypedOutcome<R>> consumer) {
     return support.deliverResults(
         batchSize, ClientSupport.DEFAULT_LEASE, ClientSupport.DEFAULT_BACKOFF, consumer);
   }
 
+  /**
+   * As {@link #deliverResults(BatchSize, BiConsumer)} with an explicit lease (must exceed the
+   * worst-case consumer time) and failure backoff.
+   *
+   * @param batchSize the maximum deliveries to process
+   * @param lease how long claimed deliveries stay invisible to other claimers
+   * @param backoff how long a failed delivery waits before redelivery
+   * @param consumer receives the decoded continuation and typed outcome
+   * @return the number successfully delivered
+   */
   public int deliverResults(
       BatchSize batchSize, Lease lease, Backoff backoff, BiConsumer<C, TypedOutcome<R>> consumer) {
     return support.deliverResults(batchSize, lease, backoff, consumer);
   }
 
+  /**
+   * Sweeps up to a batch of this kind's overdue computations, consulting the retry for each:
+   * redispatched computations get an extended deadline and an incremented attempt count; {@code
+   * notRetried} terminalizes as {@code Expired(RETRY_EXHAUSTED, reason)} through the normal
+   * delivery path; a throwing retry leaves the computation untouched for the next pump. Duplicate
+   * redispatch requests across concurrent pumps are possible — the idempotency key in the dispatch
+   * payload makes them harmless.
+   *
+   * @param batchSize the maximum expired computations to process
+   * @param retry performs (or schedules) the redispatch and reports what it did
+   * @return the number processed
+   */
   public int retryExpiredComputations(BatchSize batchSize, Retry<D> retry) {
     Objects.requireNonNull(retry, "retry must not be null");
     int reaped = 0;
+    Instant observedAt = support.now();
     for (Computation computation : support.findExpired(batchSize)) {
       if (computation.dispatchPayload() == null) {
         support.failExpired(
             computation,
             ExpiryKind.RETRY_DISALLOWED,
-            "deadline " + computation.deadline() + " passed");
+            "expired after "
+                + ClientSupport.describeElapsed(
+                    Duration.between(computation.submittedAt(), observedAt)));
         reaped++;
         continue;
       }
@@ -105,11 +180,13 @@ public final class RetryableContinuumClient<R, C, D> {
         RetryResult result =
             retry.onTimeout(
                 dispatchCodec.decode(computation.dispatchPayload()),
-                new RetryContext(
+                new ExpiryContext(
                     computation.id(),
                     computation.kind(),
                     computation.attemptCount(),
-                    computation.deadline()));
+                    computation.submittedAt(),
+                    computation.deadline(),
+                    observedAt));
         switch (result) {
           case RetryResult.Retried(Duration timeout) ->
               support
@@ -141,10 +218,23 @@ public final class RetryableContinuumClient<R, C, D> {
     return reaped;
   }
 
+  /**
+   * Deletes up to a batch of this kind's memoized results older than the call-site TTL. After
+   * purge, a computation behaves as never known.
+   *
+   * @param batchSize the maximum result records to delete
+   * @param ttl how long results outlive completion
+   * @return the number purged
+   */
   public int purgeExpiredResults(BatchSize batchSize, ResultTtl ttl) {
     return support.purgeExpiredResults(batchSize, ttl);
   }
 
+  /**
+   * The computation kind this client is bound to.
+   *
+   * @return the kind
+   */
   public ComputationKind kind() {
     return support.kind();
   }

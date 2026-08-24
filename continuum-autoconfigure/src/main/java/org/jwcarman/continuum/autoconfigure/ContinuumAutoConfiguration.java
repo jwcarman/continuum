@@ -36,6 +36,18 @@ public class ContinuumAutoConfiguration {
 
   private static final Logger log = LoggerFactory.getLogger(ContinuumAutoConfiguration.class);
 
+  /** Instantiated by Spring Boot's auto-configuration machinery, not by application code. */
+  public ContinuumAutoConfiguration() {
+    // Spring instantiates this class reflectively; nothing to initialize.
+  }
+
+  /**
+   * Contributes an in-memory repository as the last resort, only when the application context
+   * defines no {@link ContinuumRepository} of its own — and logs a warning, because the fallback
+   * silently loses every computation on restart.
+   *
+   * @return a fresh {@link InMemoryContinuumRepository}
+   */
   @Bean
   @ConditionalOnMissingBean(ContinuumRepository.class)
   public ContinuumRepository inMemoryContinuumRepository() {
@@ -46,6 +58,16 @@ public class ContinuumAutoConfiguration {
     return new InMemoryContinuumRepository();
   }
 
+  /**
+   * Contributes the {@link Continuum} facade unless the application defines its own, wiring it to
+   * whichever {@link ContinuumRepository} won the context and to an {@link InstantSource} bean if
+   * one is present — tests supply a fixed source here; production falls back to {@link
+   * InstantSource#system()}.
+   *
+   * @param repository the repository backing durability and atomicity
+   * @param instants an optional clock override; absent means the system clock
+   * @return the configured {@link Continuum}
+   */
   @Bean
   @ConditionalOnMissingBean(Continuum.class)
   public Continuum continuum(

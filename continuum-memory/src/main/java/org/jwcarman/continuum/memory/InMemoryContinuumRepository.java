@@ -51,6 +51,11 @@ public final class InMemoryContinuumRepository implements ContinuumRepository {
   private final Map<ComputationId, TerminalRecord> results = new HashMap<>();
   private final Map<DeliveryId, OutboxItem> outbox = new LinkedHashMap<>();
 
+  /** Creates an empty repository; all state lives in this instance and dies with it. */
+  public InMemoryContinuumRepository() {
+    // Fields are initialized inline; nothing further to do.
+  }
+
   private record TerminalRecord(Computation computation, Instant completedAt) {}
 
   private static final class OutboxItem {
@@ -109,7 +114,7 @@ public final class InMemoryContinuumRepository implements ContinuumRepository {
               current.id(),
               current.kind(),
               Outcome.statusOf(outcome),
-              current.createdAt(),
+              current.submittedAt(),
               current.deadline(),
               null,
               current.attemptCount(),
@@ -120,7 +125,13 @@ public final class InMemoryContinuumRepository implements ContinuumRepository {
             new OutboxItem(
                 DeliveryId.random(),
                 new CompletionDelivery(
-                    id, current.kind(), continuation.id(), continuation.payload(), outcome),
+                    id,
+                    current.kind(),
+                    continuation.id(),
+                    continuation.payload(),
+                    outcome,
+                    current.submittedAt(),
+                    completedAt),
                 completedAt);
         outbox.put(item.id, item);
       }
@@ -200,7 +211,7 @@ public final class InMemoryContinuumRepository implements ContinuumRepository {
                   computation.id(),
                   computation.kind(),
                   computation.status(),
-                  computation.createdAt(),
+                  computation.submittedAt(),
                   newDeadline,
                   computation.dispatchPayload(),
                   attemptCount,

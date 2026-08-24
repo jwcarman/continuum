@@ -15,9 +15,20 @@
  */
 package org.jwcarman.continuum;
 
+/**
+ * Fills in a {@link RetryableClientConfig} — the only thing a customizer ever does.
+ *
+ * @param <R> the result type
+ * @param <C> the continuation type
+ * @param <D> the dispatch type
+ */
 @FunctionalInterface
-/** Fills in a {@link RetryableClientConfig} — the only thing a customizer ever does. */
 public interface RetryableClientCustomizer<R, C, D> {
 
+  /**
+   * Applies this customizer's settings to the given config.
+   *
+   * @param config the mutable config to populate
+   */
   void customize(RetryableClientConfig<R, C, D> config);
 }

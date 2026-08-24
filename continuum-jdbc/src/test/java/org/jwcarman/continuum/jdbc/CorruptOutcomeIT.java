@@ -42,7 +42,7 @@ class CorruptOutcomeIT {
         PreparedStatement insert =
             connection.prepareStatement(
                 "INSERT INTO continuum_result "
-                    + "(computation_id, kind, outcome_type, deadline_at, attempt_count, created_at, completed_at) "
+                    + "(computation_id, kind, outcome_type, deadline_at, attempt_count, submitted_at, completed_at) "
                     + "VALUES (?, 'k', 'GARBAGE', ?, 1, ?, ?)")) {
       insert.setObject(1, UUID.fromString(id.value().toString()));
       Timestamp now = Timestamp.from(Instant.now());

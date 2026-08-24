@@ -25,8 +25,19 @@ import java.util.Objects;
  */
 public sealed interface TimeSpan permits Lease, Backoff, ResultTtl {
 
+  /**
+   * The underlying duration.
+   *
+   * @return the duration, always positive
+   */
   Duration value();
 
+  /**
+   * Validates a time-span duration.
+   *
+   * @param value the duration to validate
+   * @return the duration, if positive
+   */
   static Duration requirePositive(Duration value) {
     Objects.requireNonNull(value, "value must not be null");
     if (value.isZero() || value.isNegative()) {

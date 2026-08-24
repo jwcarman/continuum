@@ -92,7 +92,7 @@ class DefaultContinuumTest {
 
       assertThat(computationCaptor.getValue()).isEqualTo(computation);
       assertThat(computation.status()).isEqualTo(ComputationStatus.PENDING);
-      assertThat(computation.createdAt()).isEqualTo(NOW);
+      assertThat(computation.submittedAt()).isEqualTo(NOW);
       assertThat(computation.attemptCount()).isEqualTo(1);
       assertThat(computation.outcome()).isNull();
       assertThat(continuationCaptor.getValue().payload()).isEqualTo("c".getBytes(UTF_8));

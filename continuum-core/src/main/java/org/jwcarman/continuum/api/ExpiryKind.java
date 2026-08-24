@@ -21,6 +21,14 @@ package org.jwcarman.continuum.api;
  * declined to continue. Each value can only be minted by its own path, so consumers can trust it.
  */
 public enum ExpiryKind {
+  /**
+   * The kind was never retryable — no dispatch payload existed, so there was nothing to redispatch
+   * and the lapse was terminal on first observation.
+   */
   RETRY_DISALLOWED,
+  /**
+   * Retrying was possible, but the {@code Retry} declined to continue. The reason it gave is
+   * carried on the expired outcome's message.
+   */
   RETRY_EXHAUSTED
 }

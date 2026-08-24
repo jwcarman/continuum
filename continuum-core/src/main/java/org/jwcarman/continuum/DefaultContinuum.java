@@ -35,18 +35,30 @@ import org.jwcarman.continuum.spi.StoredContinuation;
  * The standard {@link Continuum}: coordination logic over a {@link ContinuumRepository}. There is
  * one time authority per instance — the given {@link InstantSource} — from which all deadline
  * arithmetic derives.
+ *
+ * @param repository the persistence SPI beneath this instance
+ * @param instants the single time authority for this instance
  */
 public record DefaultContinuum(ContinuumRepository repository, InstantSource instants)
     implements Continuum {
 
   private static final String ID_NULL_MESSAGE = "id must not be null";
 
+  /**
+   * Requires both collaborators — there is no default repository and no implicit system clock.
+   *
+   * @throws NullPointerException if {@code repository} or {@code instants} is null
+   */
   public DefaultContinuum {
     Objects.requireNonNull(repository, "repository must not be null");
     Objects.requireNonNull(instants, "instants must not be null");
   }
 
-  /** Coordinates against {@code repository} on the system instant source. */
+  /**
+   * Coordinates against {@code repository} on the system instant source.
+   *
+   * @param repository the persistence SPI beneath this instance
+   */
   public DefaultContinuum(ContinuumRepository repository) {
     this(repository, InstantSource.system());
   }

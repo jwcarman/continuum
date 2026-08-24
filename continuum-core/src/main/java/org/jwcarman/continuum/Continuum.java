@@ -34,18 +34,73 @@ import org.jwcarman.continuum.spi.ContinuumRepository;
  */
 public interface Continuum {
 
+  /**
+   * Atomically persists a new pending computation together with its mandatory initial continuation
+   * — either both exist afterward or neither does.
+   *
+   * @param request the kind, initial continuation payload, deadline, and optional dispatch payload
+   * @return the persisted pending computation (attempt count 1)
+   */
   Computation create(ComputationRequest request);
 
+  /**
+   * Registers interest in a computation, atomically with respect to completion: if still pending,
+   * the continuation is durably registered and guaranteed a delivery; if already resolved, the
+   * memoized outcome is returned and nothing is persisted. Never neither.
+   *
+   * @param id the computation to watch
+   * @param continuationPayload opaque bytes describing what should receive the outcome
+   * @return the registration or the memoized outcome
+   * @throws org.jwcarman.continuum.api.ComputationNotFoundException if the computation never
+   *     existed or was purged
+   */
   RegistrationResult registerContinuation(ComputationId id, byte[] continuationPayload);
 
+  /**
+   * Reports a computation's terminal outcome. First successful terminalization wins; the stored
+   * outcome is immutable thereafter, and one outbox delivery is fanned out per registered
+   * continuation in the same transaction.
+   *
+   * @param id the computation to resolve
+   * @param outcome {@code Success} or {@code Failure}; {@code Expired} is rejected — expiry is
+   *     minted only by timeout processing
+   * @return whether this call won, lost to an earlier resolution, or found nothing
+   */
   CompletionResult complete(ComputationId id, Outcome outcome);
 
+  /**
+   * Looks up a computation — pending, or memoized terminal until purged.
+   *
+   * @param id the computation id
+   * @return the computation, or empty if unknown or purged
+   */
   Optional<Computation> find(ComputationId id);
 
+  /**
+   * The single time authority for this instance; all deadline arithmetic derives from it.
+   *
+   * @return the instant source
+   */
   InstantSource instants();
 
+  /**
+   * The persistence SPI beneath this instance — also the raw pumping surface for untyped use.
+   *
+   * @return the repository
+   */
   ContinuumRepository repository();
 
+  /**
+   * Mints the typed client for a non-retryable kind.
+   *
+   * @param kind the computation kind
+   * @param resultType the result type
+   * @param continuationType the continuation type
+   * @param customizer fills in codecs and the per-attempt deadline
+   * @param <R> the result type
+   * @param <C> the continuation type
+   * @return the client
+   */
   default <R, C> ContinuumClient<R, C> client(
       String kind,
       Class<R> resultType,
@@ -57,6 +112,19 @@ public interface Continuum {
         config.buildSupport(this, new ComputationKind(kind), resultType, continuationType));
   }
 
+  /**
+   * Mints the typed client for a retryable kind.
+   *
+   * @param kind the computation kind
+   * @param resultType the result type
+   * @param continuationType the continuation type
+   * @param dispatchType the dispatch type
+   * @param customizer fills in codecs and the per-attempt deadline
+   * @param <R> the result type
+   * @param <C> the continuation type
+   * @param <D> the dispatch type
+   * @return the client
+   */
   default <R, C, D> RetryableContinuumClient<R, C, D> client(
       String kind,
       Class<R> resultType,

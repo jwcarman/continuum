@@ -24,28 +24,50 @@ import java.util.Objects;
  * a pending record exists, otherwise a 1:1 reading of the memoized outcome. {@code dispatchPayload}
  * presence is what retryable means; {@code attemptCount} starts at 1 (the original dispatch is
  * attempt one) and is the only retry state Continuum persists.
+ *
+ * @param id the globally unique identity
+ * @param kind the computation kind
+ * @param status the derived status, never stored
+ * @param submittedAt when the computation was created
+ * @param deadline the current attempt's absolute deadline
+ * @param dispatchPayload opaque bytes replayed on every redispatch, or null if not retryable
+ * @param attemptCount how many attempts have run, counting the original dispatch as 1
+ * @param outcome the memoized terminal outcome, or null while pending
  */
 public record Computation(
     ComputationId id,
     ComputationKind kind,
     ComputationStatus status,
-    Instant createdAt,
+    Instant submittedAt,
     Instant deadline,
     byte[] dispatchPayload,
     int attemptCount,
     Outcome outcome) {
 
+  /**
+   * Requires the durable facts; {@code dispatchPayload} and {@code outcome} stay nullable because
+   * their absence is meaningful — not retryable, and still pending, respectively.
+   *
+   * @throws IllegalArgumentException if {@code attemptCount} is less than 1
+   * @throws NullPointerException if {@code id}, {@code kind}, {@code status}, {@code submittedAt},
+   *     or {@code deadline} is null
+   */
   public Computation {
     Objects.requireNonNull(id, "id must not be null");
     Objects.requireNonNull(kind, "kind must not be null");
     Objects.requireNonNull(status, "status must not be null");
-    Objects.requireNonNull(createdAt, "createdAt must not be null");
+    Objects.requireNonNull(submittedAt, "submittedAt must not be null");
     Objects.requireNonNull(deadline, "deadline must not be null");
     if (attemptCount < 1) {
       throw new IllegalArgumentException("attemptCount must be at least 1");
     }
   }
 
+  /**
+   * Whether a dispatch payload exists — the definition of retryable.
+   *
+   * @return true if this computation can be redispatched
+   */
   public boolean retryable() {
     return dispatchPayload != null;
   }
@@ -58,7 +80,7 @@ public record Computation(
                 ComputationId otherId,
                 ComputationKind otherKind,
                 ComputationStatus otherStatus,
-                Instant otherCreatedAt,
+                Instant otherSubmittedAt,
                 Instant otherDeadline,
                 byte[] otherDispatchPayload,
                 int otherAttemptCount,
@@ -67,7 +89,7 @@ public record Computation(
         && id.equals(otherId)
         && kind.equals(otherKind)
         && status == otherStatus
-        && createdAt.equals(otherCreatedAt)
+        && submittedAt.equals(otherSubmittedAt)
         && deadline.equals(otherDeadline)
         && Arrays.equals(dispatchPayload, otherDispatchPayload)
         && Objects.equals(outcome, otherOutcome);
@@ -79,7 +101,7 @@ public record Computation(
         id,
         kind,
         status,
-        createdAt,
+        submittedAt,
         deadline,
         Arrays.hashCode(dispatchPayload),
         attemptCount,

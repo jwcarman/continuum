@@ -41,6 +41,19 @@ import org.springframework.context.annotation.Bean;
 @ConditionalOnBean(DataSource.class)
 public class JdbcContinuumAutoConfiguration {
 
+  /** Instantiated by Spring Boot's auto-configuration machinery, not by application code. */
+  public JdbcContinuumAutoConfiguration() {
+    // Spring instantiates this class reflectively; nothing to initialize.
+  }
+
+  /**
+   * Contributes durable PostgreSQL persistence over the application's {@link DataSource}, unless a
+   * {@link ContinuumRepository} is already defined. Because this class is ordered before {@link
+   * ContinuumAutoConfiguration}, winning here is what suppresses the in-memory fallback.
+   *
+   * @param dataSource the application's data source; it owns pooling and schema
+   * @return a {@link JdbcContinuumRepository} bound to that data source
+   */
   @Bean
   @ConditionalOnMissingBean(ContinuumRepository.class)
   public ContinuumRepository jdbcContinuumRepository(DataSource dataSource) {

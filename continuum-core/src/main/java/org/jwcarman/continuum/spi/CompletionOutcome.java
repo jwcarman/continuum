@@ -17,7 +17,13 @@ package org.jwcarman.continuum.spi;
 
 /** The repository-level answer to a completion attempt. */
 public enum CompletionOutcome {
+  /**
+   * The write won: the outcome was stored and one delivery was enqueued per registered
+   * continuation, in the same transaction.
+   */
   COMPLETED,
+  /** An outcome was already stored. The provider must leave it untouched — first write wins. */
   ALREADY_RESOLVED,
+  /** No such computation — it never existed, or its result has been purged. */
   NOT_FOUND
 }

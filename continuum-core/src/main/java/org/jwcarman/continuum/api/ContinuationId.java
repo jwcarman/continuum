@@ -21,12 +21,25 @@ import java.util.UUID;
 /**
  * The identity of one registered continuation — assigned by Continuum, and the stable deduplication
  * key for at-least-once delivery.
+ *
+ * @param value the underlying identity
  */
 public record ContinuationId(UUID value) {
+
+  /**
+   * Requires an identity.
+   *
+   * @throws NullPointerException if {@code value} is null
+   */
   public ContinuationId {
     Objects.requireNonNull(value, "value must not be null");
   }
 
+  /**
+   * A new random identity.
+   *
+   * @return a fresh, globally unique id
+   */
   public static ContinuationId random() {
     return new ContinuationId(UUID.randomUUID());
   }

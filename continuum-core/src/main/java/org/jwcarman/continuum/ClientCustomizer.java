@@ -15,9 +15,19 @@
  */
 package org.jwcarman.continuum;
 
+/**
+ * Fills in a {@link ClientConfig} — the only thing a customizer ever does.
+ *
+ * @param <R> the result type
+ * @param <C> the continuation type
+ */
 @FunctionalInterface
-/** Fills in a {@link ClientConfig} — the only thing a customizer ever does. */
 public interface ClientCustomizer<R, C> {
 
+  /**
+   * Applies this customizer's settings to the given config.
+   *
+   * @param config the mutable config to populate
+   */
   void customize(ClientConfig<R, C> config);
 }
