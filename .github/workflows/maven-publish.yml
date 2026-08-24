@@ -24,7 +24,10 @@ jobs:
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
       - name: Set version
-        run: mvn versions:set -DnewVersion=${{ github.event.release.tag_name }}
+        # processAllModules is required: continuum-bom is deliberately parentless, so
+        # versions:set cannot reach it through a parent reference and would otherwise
+        # publish it still carrying -SNAPSHOT.
+        run: mvn versions:set -DnewVersion=${{ github.event.release.tag_name }} -DprocessAllModules=true
 
       - name: Publish package
         run: mvn -P release --batch-mode deploy -DskipTests

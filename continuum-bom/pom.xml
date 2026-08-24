@@ -16,19 +16,67 @@
     limitations under the License.
 
 -->
+<!--
+    Deliberately parentless.
+
+    A BOM's effective dependencyManagement is what consumers import, and a child
+    inherits its parent's. Inheriting continuum-parent therefore re-exported its
+    build-only pins — junit-bom, testcontainers-bom, assertj, mockito, logback,
+    the PostgreSQL driver — to everyone importing this BOM, silently overriding
+    their own. Mixed-version JUnit fails at test discovery, not resolution, so it
+    surfaces as a NoSuchMethodError that looks nothing like a BOM problem.
+
+    junit-bom, spring-boot-dependencies, testcontainers-bom and micrometer-bom are
+    all parentless for this reason; jackson-bom's parent carries no
+    dependencyManagement. The metadata and release configuration below are
+    duplicated from continuum-parent on purpose: that duplication is the price of
+    the guarantee, and these values are set-once rather than evolving.
+
+    Manage only artifacts this project owns here. Nothing else.
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <groupId>org.jwcarman.continuum</groupId>
-        <artifactId>continuum-parent</artifactId>
-        <version>0.2.0-SNAPSHOT</version>
-    </parent>
+
+    <groupId>org.jwcarman.continuum</groupId>
     <artifactId>continuum-bom</artifactId>
+    <version>0.2.0-SNAPSHOT</version>
     <packaging>pom</packaging>
+
     <name>Continuum BOM</name>
     <description>Bill of materials for Continuum modules</description>
+    <url>https://github.com/jwcarman/continuum</url>
+    <inceptionYear>2026</inceptionYear>
+
+    <developers>
+        <developer>
+            <id>jwcarman</id>
+            <name>James Carman</name>
+        </developer>
+    </developers>
+
+    <licenses>
+        <license>
+            <name>Apache 2</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
+
+    <scm>
+        <url>https://github.com/jwcarman/continuum</url>
+        <connection>scm:git:git@github.com:jwcarman/continuum.git</connection>
+        <developerConnection>scm:git:git@github.com:jwcarman/continuum.git</developerConnection>
+    </scm>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <gpg.plugin.version>3.2.8</gpg.plugin.version>
+        <sonatype.plugin.version>0.10.0</sonatype.plugin.version>
+    </properties>
+
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -63,4 +111,45 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>${sonatype.plugin.version}</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <tokenAuth>true</tokenAuth>
+                            <autoPublish>true</autoPublish>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>${gpg.plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
