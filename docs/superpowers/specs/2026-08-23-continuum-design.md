@@ -146,20 +146,32 @@ dependencies, so `continuum-core` depends on it directly alongside slf4j-api).
       RetryResult onTimeout(D dispatch, RetryContext ctx);
 
       sealed interface RetryResult {
-          record Retried(Instant newDeadline) implements RetryResult {}
-          record RetriedFor(Duration timeout) implements RetryResult {} // now + timeout
+          record Retried(Duration timeout) implements RetryResult {}  // new deadline = now + timeout
+          record RetriedDefault() implements RetryResult {}           // now + the client's configured timeout
           record NotRetried(String reason) implements RetryResult {}
+
+          static RetryResult retried() { ... }
+          static RetryResult retried(Duration timeout) { ... }
+          static RetryResult notRetried(String reason) { ... }
       }
   }
   ```
 
-  The mapping to the core `RetryHandler` is exact: `Retried`/`RetriedFor` →
-  `Redispatched(newDeadline)`; `NotRetried` → `Abandon` →
-  `TIMEOUT_RETRY_EXHAUSTED`. A bare `retried()` defaults the new deadline to
-  the client's configured `deadline(Duration)`. `RetryContext` carries
-  `attemptCount`, `invocationId`, kind, metadata, and the expired deadline;
-  `D` is the decoded dispatch payload. Declarative policies are combinators
-  over this functional core — `Retry.atMost(n, inner)` returns
+  Time vocabulary is deliberately split: **durations at the typed layer,
+  instants at the wire/storage layer.** A durable row must hold an absolute
+  deadline, so the raw level stays `Instant`
+  (`ComputationRequest.deadline`, `Redispatched(Instant)`, `deadline_at`);
+  the typed layer only ever speaks timeouts, and the adapter converts
+  (`now + timeout`) at the same boundary where codecs convert types to bytes.
+
+  The `RetryResult` values are pure data; the router-built adapter that wraps
+  each client's `Retry` into the core `RetryHandler` interprets them with the
+  client's config in hand: `Retried(timeout)` → `Redispatched(now + timeout)`;
+  `RetriedDefault` → `Redispatched(now + client's configured deadline)`;
+  `NotRetried` → `Abandon` → `TIMEOUT_RETRY_EXHAUSTED`. `RetryContext`
+  carries `attemptCount`, `invocationId`, kind, metadata, and the expired
+  deadline; `D` is the decoded dispatch payload. Declarative policies are
+  combinators over this functional core — `Retry.atMost(n, inner)` returns
   `NotRetried("attempts exhausted")` once `ctx.attemptCount() >= n` without
   invoking the inner retry. A client configured with **no** `Retry` creates
   `NON_RETRYABLE` computations — the presence of a `Retry` is what
