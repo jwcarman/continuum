@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.continuum.Continuum;
+import org.jwcarman.continuum.DefaultContinuum;
 import org.jwcarman.continuum.jdbc.JdbcContinuumRepository;
 import org.jwcarman.continuum.memory.InMemoryContinuumRepository;
 import org.jwcarman.continuum.spi.ContinuumRepository;
@@ -63,6 +64,16 @@ class ContinuumAutoConfigurationTest {
 
     @Bean
     ContinuumRepository customRepository() {
+      return CUSTOM;
+    }
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class CustomContinuumConfiguration {
+    static final Continuum CUSTOM = new DefaultContinuum(new InMemoryContinuumRepository());
+
+    @Bean
+    Continuum continuum() {
       return CUSTOM;
     }
   }
@@ -151,6 +162,16 @@ class ContinuumAutoConfigurationTest {
             assertThat(continuum.repository()).isSameAs(context.getBean(ContinuumRepository.class));
             assertThat(continuum.instants()).isEqualTo(InstantSource.system());
           });
+    }
+
+    @Test
+    void an_application_defined_continuum_wins() {
+      runner
+          .withUserConfiguration(CustomContinuumConfiguration.class)
+          .run(
+              context ->
+                  assertThat(context.getBean(Continuum.class))
+                      .isSameAs(CustomContinuumConfiguration.CUSTOM));
     }
 
     @Test
