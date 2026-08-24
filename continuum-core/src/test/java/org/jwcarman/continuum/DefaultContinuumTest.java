@@ -58,6 +58,16 @@ class DefaultContinuumTest {
   }
 
   @Nested
+  class Constructing {
+    @Test
+    void repository_only_constructor_defaults_to_the_system_instant_source() {
+      var systemDefault = new DefaultContinuum(repository);
+      assertThat(systemDefault.instants()).isEqualTo(InstantSource.system());
+      assertThat(systemDefault.repository()).isSameAs(repository);
+    }
+  }
+
+  @Nested
   class Creating {
     @Test
     void persists_pending_computation_with_initial_continuation() {

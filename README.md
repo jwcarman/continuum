@@ -56,8 +56,7 @@ expect SLF4J's NOP warning.
 Wire the core once, then mint a typed client per computation *kind*:
 
 ```java
-Continuum continuum = new DefaultContinuum(
-    new JdbcContinuumRepository(dataSource), InstantSource.system());
+Continuum continuum = new DefaultContinuum(new JdbcContinuumRepository(dataSource));
 
 var toolCalls = continuum.client(
     "tool-result",

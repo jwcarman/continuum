@@ -32,6 +32,11 @@ public record DefaultContinuum(ContinuumRepository repository, InstantSource ins
     Objects.requireNonNull(instants, "instants must not be null");
   }
 
+  /** Coordinates against {@code repository} on the system instant source. */
+  public DefaultContinuum(ContinuumRepository repository) {
+    this(repository, InstantSource.system());
+  }
+
   @Override
   public Computation create(ComputationRequest request) {
     Objects.requireNonNull(request, "request must not be null");
