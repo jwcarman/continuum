@@ -117,9 +117,12 @@ dependencies, so `continuum-core` depends on it directly alongside slf4j-api).
 
 **Construction idiom (house style, as in Nessy):** every configurable
 component is built through a named `XxxCustomizer` functional interface —
-never a bare `Consumer` — whose lambda receives an `XxxConfig` with fluent
-setters and **no public `build()`**; the factory method creates the config,
-applies the customizer, and performs the build step itself. This applies to
+never a bare `Consumer` — whose lambda receives an `XxxConfig`. The config is
+an **interface** exposing only fluent configuration-parameter methods that
+return the config itself — no `build()` in the contract. The concrete
+implementation behind it is the builder, but the receiver cannot know that:
+the factory method constructs it, applies the customizer, and performs the
+build step privately. This applies to
 `Continuum.client(...)` (`ClientCustomizer` / `ClientConfig<R, C, D>`),
 `DeliveryRouter.of(r -> r.on(...).fallback(...))`, `DeliveryPump.of(repo,
 router, p -> p.batchSize(...).lease(...).workerId(...))`, and
