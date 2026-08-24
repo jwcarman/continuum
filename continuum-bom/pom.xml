@@ -51,6 +51,16 @@
                 <artifactId>continuum-testing</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.jwcarman.continuum</groupId>
+                <artifactId>continuum-autoconfigure</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jwcarman.continuum</groupId>
+                <artifactId>continuum-spring-boot-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 </project>

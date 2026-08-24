@@ -50,6 +50,7 @@ expect SLF4J's NOP warning.
 | `continuum-memory` | In-memory persistence for tests/embedded use |
 | `continuum-jdbc` | PostgreSQL persistence |
 | `continuum-testing` | TCK for certifying persistence providers |
+| `continuum-spring-boot-starter` | Boot auto-configuration (with `continuum-autoconfigure`) |
 
 ## Quick start
 
@@ -78,6 +79,17 @@ Anywhere, any process, any time later, the worker reports back:
 ```java
 toolCalls.complete(computationId, new ToolCallResult(...));   // or .fail(id, "reason")
 ```
+
+## Spring Boot
+
+Add `continuum-spring-boot-starter` and a `Continuum` bean is auto-configured:
+with `continuum-jdbc` on the classpath and a `DataSource` defined you get
+durable PostgreSQL persistence; otherwise the starter falls back to the
+in-memory repository and logs a warning (fine for tests, not for production —
+computations will not survive restarts). An application-defined
+`ContinuumRepository` or `InstantSource` bean always wins. Clients stay
+app-defined `@Bean`s (they carry your types and codecs), and pumping is your
+`@Scheduled` methods, as below.
 
 ## Pumping
 

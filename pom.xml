@@ -58,7 +58,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jacocoArgLine></jacocoArgLine>
 
-        <codec.version>0.1.0</codec.version>
+        <codec.version>0.2.0</codec.version>
         <slf4j.version>2.0.17</slf4j.version>
         <logback.version>1.5.18</logback.version>
         <junit.version>5.14.0</junit.version>
@@ -67,6 +67,7 @@
         <bytebuddy.version>1.18.8</bytebuddy.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <postgresql.version>42.7.7</postgresql.version>
+        <spring-boot.version>4.0.5</spring-boot.version>
 
         <surefire.plugin.version>3.5.4</surefire.plugin.version>
         <spotless.version>3.4.0</spotless.version>
@@ -112,6 +113,8 @@
         <module>continuum-memory</module>
         <module>continuum-testing</module>
         <module>continuum-jdbc</module>
+        <module>continuum-autoconfigure</module>
+        <module>continuum-spring-boot-starter</module>
     </modules>
 
     <dependencyManagement>
@@ -188,6 +191,16 @@
             <dependency>
                 <groupId>org.jwcarman.continuum</groupId>
                 <artifactId>continuum-jdbc</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jwcarman.continuum</groupId>
+                <artifactId>continuum-autoconfigure</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jwcarman.continuum</groupId>
+                <artifactId>continuum-spring-boot-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

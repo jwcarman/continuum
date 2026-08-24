@@ -24,3 +24,8 @@ All notable changes to this project will be documented in this file.
 - `continuum-testing`: TCK exercising the full concurrency battery, run by
   both providers.
 - `continuum-bom`.
+- `continuum-spring-boot-starter` + `continuum-autoconfigure`: auto-configures
+  `JdbcContinuumRepository` (when `continuum-jdbc` and a `DataSource` are
+  present) or falls back to the in-memory repository with a warning, and wires
+  a `Continuum` over it (honoring app-defined `ContinuumRepository` /
+  `InstantSource` beans).
