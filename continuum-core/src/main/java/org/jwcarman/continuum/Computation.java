@@ -46,15 +46,25 @@ public record Computation(
 
   @Override
   public boolean equals(Object o) {
-    return o instanceof Computation other
-        && attemptCount == other.attemptCount
-        && id.equals(other.id)
-        && kind.equals(other.kind)
-        && status == other.status
-        && createdAt.equals(other.createdAt)
-        && deadline.equals(other.deadline)
-        && Arrays.equals(dispatchPayload, other.dispatchPayload)
-        && Objects.equals(outcome, other.outcome);
+    return o
+            instanceof
+            Computation(
+                ComputationId otherId,
+                ComputationKind otherKind,
+                ComputationStatus otherStatus,
+                Instant otherCreatedAt,
+                Instant otherDeadline,
+                byte[] otherDispatchPayload,
+                int otherAttemptCount,
+                Outcome otherOutcome)
+        && attemptCount == otherAttemptCount
+        && id.equals(otherId)
+        && kind.equals(otherKind)
+        && status == otherStatus
+        && createdAt.equals(otherCreatedAt)
+        && deadline.equals(otherDeadline)
+        && Arrays.equals(dispatchPayload, otherDispatchPayload)
+        && Objects.equals(outcome, otherOutcome);
   }
 
   @Override

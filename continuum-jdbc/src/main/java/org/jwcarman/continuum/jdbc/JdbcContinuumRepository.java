@@ -62,16 +62,21 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
   private <T> T inTransaction(SqlWork<T> work) {
     try (Connection connection = dataSource.getConnection()) {
       connection.setAutoCommit(false);
-      try {
-        T result = work.perform(connection);
-        connection.commit();
-        return result;
-      } catch (SQLException | RuntimeException e) {
-        connection.rollback();
-        throw e;
-      }
+      return commitOrRollback(work, connection);
     } catch (SQLException e) {
       throw new ContinuumPersistenceException("database operation failed", e);
+    }
+  }
+
+  private static <T> T commitOrRollback(SqlWork<T> work, Connection connection)
+      throws SQLException {
+    try {
+      T result = work.perform(connection);
+      connection.commit();
+      return result;
+    } catch (SQLException | RuntimeException e) {
+      connection.rollback();
+      throw e;
     }
   }
 

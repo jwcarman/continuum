@@ -97,10 +97,11 @@ final class ClientSupport<R, C> {
 
   TypedOutcome<R> decode(Outcome outcome) {
     return switch (outcome) {
-      case Outcome.Success success ->
-          new TypedOutcome.Success<>(resultCodec.decode(success.payload()));
-      case Outcome.Failure failure -> new TypedOutcome.Failure<>(failure.message());
-      case Outcome.Expired expired -> new TypedOutcome.Expired<>(expired.kind(), expired.message());
+      case Outcome.Success(byte[] payload) ->
+          new TypedOutcome.Success<>(resultCodec.decode(payload));
+      case Outcome.Failure(String message) -> new TypedOutcome.Failure<>(message);
+      case Outcome.Expired(ExpiryKind expiryKind, String message) ->
+          new TypedOutcome.Expired<>(expiryKind, message);
     };
   }
 

@@ -30,11 +30,17 @@ public record ComputationRequest(
 
   @Override
   public boolean equals(Object o) {
-    return o instanceof ComputationRequest other
-        && kind.equals(other.kind)
-        && Arrays.equals(continuationPayload, other.continuationPayload)
-        && deadline.equals(other.deadline)
-        && Arrays.equals(dispatchPayload, other.dispatchPayload);
+    return o
+            instanceof
+            ComputationRequest(
+                ComputationKind otherKind,
+                byte[] otherContinuationPayload,
+                Instant otherDeadline,
+                byte[] otherDispatchPayload)
+        && kind.equals(otherKind)
+        && Arrays.equals(continuationPayload, otherContinuationPayload)
+        && deadline.equals(otherDeadline)
+        && Arrays.equals(dispatchPayload, otherDispatchPayload);
   }
 
   @Override

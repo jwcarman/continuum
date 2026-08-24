@@ -27,6 +27,23 @@ the work receives the `ComputationId` and eventually reports the outcome.
 Or import the BOM (`org.jwcarman.continuum:continuum-bom`) and add modules
 version-free.
 
+Serialization is pluggable through [codec](https://github.com/jwcarman/codec)
+(`org.jwcarman.codec`). The quick start below uses the Jackson 3 backend —
+a separate dependency:
+
+```xml
+<dependency>
+    <groupId>org.jwcarman.codec</groupId>
+    <artifactId>codec-jackson</artifactId>
+    <version>${codec.version}</version>
+</dependency>
+```
+
+(`codec-gson` and `codec-protobuf` work the same way, or implement
+`Codec<T>` directly.) Continuum logs through `slf4j-api` only — add the
+SLF4J provider your application already uses (e.g. `logback-classic`) or
+expect SLF4J's NOP warning.
+
 | Module | Purpose |
 |---|---|
 | `continuum-core` | API, typed clients, persistence SPI |
@@ -71,9 +88,9 @@ the client; schedule them however you like (fixed-delay recommended):
 ```java
 scheduler.scheduleWithFixedDelay(() ->
     toolCalls.deliverResults(25, (continuation, outcome) -> switch (outcome) {
-        case Success<ToolCallResult>(var result) -> backlog.recordResult(continuation, result);
-        case Failure<ToolCallResult>(var message) -> backlog.recordFailure(continuation, message);
-        case Expired<ToolCallResult>(var kind, var message) -> backlog.recordTimeout(continuation, kind);
+        case TypedOutcome.Success<ToolCallResult>(var result) -> backlog.recordResult(continuation, result);
+        case TypedOutcome.Failure<ToolCallResult>(var message) -> backlog.recordFailure(continuation, message);
+        case TypedOutcome.Expired<ToolCallResult>(var kind, var message) -> backlog.recordTimeout(continuation, kind);
     }), 0, 1, TimeUnit.SECONDS);
 
 scheduler.scheduleWithFixedDelay(() ->

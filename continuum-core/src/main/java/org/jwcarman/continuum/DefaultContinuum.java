@@ -59,8 +59,8 @@ public record DefaultContinuum(ContinuumRepository repository, InstantSource ins
     return switch (repository.registerContinuation(
         id, new StoredContinuation(continuationId, continuationPayload))) {
       case RegistrationOutcome.Registered _ -> new RegistrationResult.Registered(continuationId);
-      case RegistrationOutcome.Resolved resolved ->
-          new RegistrationResult.Resolved(resolved.outcome());
+      case RegistrationOutcome.Resolved(Outcome memoized) ->
+          new RegistrationResult.Resolved(memoized);
       case RegistrationOutcome.NotFound _ -> throw new ComputationNotFoundException(id);
     };
   }

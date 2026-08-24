@@ -35,12 +35,19 @@ public record CompletionDelivery(
 
   @Override
   public boolean equals(Object o) {
-    return o instanceof CompletionDelivery other
-        && computationId.equals(other.computationId)
-        && kind.equals(other.kind)
-        && continuationId.equals(other.continuationId)
-        && Arrays.equals(continuationPayload, other.continuationPayload)
-        && outcome.equals(other.outcome);
+    return o
+            instanceof
+            CompletionDelivery(
+                ComputationId otherComputationId,
+                ComputationKind otherKind,
+                ContinuationId otherContinuationId,
+                byte[] otherContinuationPayload,
+                Outcome otherOutcome)
+        && computationId.equals(otherComputationId)
+        && kind.equals(otherKind)
+        && continuationId.equals(otherContinuationId)
+        && Arrays.equals(continuationPayload, otherContinuationPayload)
+        && outcome.equals(otherOutcome);
   }
 
   @Override

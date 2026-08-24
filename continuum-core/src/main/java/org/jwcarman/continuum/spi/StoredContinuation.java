@@ -28,9 +28,9 @@ public record StoredContinuation(ContinuationId id, byte[] payload) {
 
   @Override
   public boolean equals(Object o) {
-    return o instanceof StoredContinuation other
-        && id.equals(other.id)
-        && Arrays.equals(payload, other.payload);
+    return o instanceof StoredContinuation(ContinuationId otherId, byte[] otherPayload)
+        && id.equals(otherId)
+        && Arrays.equals(payload, otherPayload);
   }
 
   @Override
