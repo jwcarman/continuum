@@ -1,6 +1,21 @@
 # Continuum
 
+[![CI](https://github.com/jwcarman/continuum/actions/workflows/maven.yml/badge.svg)](https://github.com/jwcarman/continuum/actions/workflows/maven.yml)
+[![CodeQL](https://github.com/jwcarman/continuum/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/jwcarman/continuum/actions/workflows/github-code-scanning/codeql)
+[![Docs](https://github.com/jwcarman/continuum/actions/workflows/docs.yml/badge.svg)](https://jwcarman.github.io/continuum/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Java](https://img.shields.io/badge/dynamic/xml?url=https://raw.githubusercontent.com/jwcarman/continuum/main/pom.xml&query=//*[local-name()='maven.compiler.release']/text()&label=Java&color=orange)](https://openjdk.org/)
+[![Maven Central](https://img.shields.io/maven-central/v/org.jwcarman.continuum/continuum-core)](https://central.sonatype.com/artifact/org.jwcarman.continuum/continuum-core)
+
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_continuum&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=jwcarman_continuum)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_continuum&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=jwcarman_continuum)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_continuum&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=jwcarman_continuum)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_continuum&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=jwcarman_continuum)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_continuum&metric=coverage)](https://sonarcloud.io/summary/new_code?id=jwcarman_continuum)
+
 Durable computation coordination for Java.
+
+**[Documentation](https://jwcarman.github.io/continuum/)**
 
 > **One computation. One eventual result. Any number of durable continuations.**
 
