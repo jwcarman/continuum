@@ -55,9 +55,10 @@ The public API follows the specification's suggested types verbatim:
   `INFRASTRUCTURE_FAILURE`.
 - `RetrySemantics` — `RETRYABLE`, `NON_RETRYABLE`.
 - `Computation` — id, kind, status, createdAt, deadline, outcome (absent while
-  pending), plus retrySemantics, invocationId, metadata, attemptCount.
+  pending), plus retrySemantics, invocationId, dispatchPayload, metadata,
+  attemptCount.
 - `ComputationRequest(kind, continuationPayload, deadline, retrySemantics,
-  invocationId, metadata)`.
+  invocationId, dispatchPayload, metadata)`.
 - `RegistrationResult` — sealed: `Registered(ContinuationId)` | `Resolved(Outcome)`.
 - `CompletionResult` — `COMPLETED`, `ALREADY_RESOLVED`, `NOT_FOUND`.
 - `CompletionDelivery(computationId, kind, continuationId, continuationPayload,
@@ -81,8 +82,23 @@ Decisions the specification left open:
 3. **Time** — an injected `java.time.InstantSource` (every `Clock` is an
    `InstantSource`; Continuum never needs a `ZoneId`). Tests use fixed/steppable
    sources.
-4. **Payloads are opaque `byte[]`** end to end. No serialization framework in
-   core; applications encode/decode their own continuation payloads and results.
+4. **Payloads are opaque `byte[]`** end to end — the outcome payload, the
+   continuation payload, and the dispatch payload alike. The caller owns the
+   serialization strategy; core holds no codec, no serializer SPI, and no type
+   parameters. Generics are deliberately rejected on `Continuum` itself: one
+   instance coordinates many kinds with different result/continuation/dispatch
+   types, and the delivery pump drains a mixed-kind outbox, so no single type
+   assignment is honest. A typed per-kind facade (e.g. a `continuum-codec`
+   module over `org.jwcarman.codec`) is an explicit fast-follow candidate, built
+   entirely on the public API.
+5. **Dispatch payload (retry breadcrumb)** — `ComputationRequest` accepts an
+   optional opaque `byte[] dispatchPayload` meaning "how to (re)dispatch this
+   work," mirroring the continuation payload's "what to do with the result." It
+   is persisted atomically with the computation at create (riding invariant I2's
+   transaction), never mutated, never interpreted by Continuum, and handed back
+   to the `RetryHandler` via `ExpiredComputation`. Apps with their own durable
+   dispatch state may leave it null and use `invocationId` as a foreign key.
+   It is a write-once breadcrumb, not mutable workflow state (non-goal §3).
 
 ## 3. Pump components (no threads)
 
@@ -112,20 +128,59 @@ int pump(); // returns number successfully delivered
 int pump(); // returns number of expired computations processed
 ```
 
+The `RetryHandler` is a **required constructor argument** of the reaper (no
+global registry to forget; "no handler" is a compile error, not a runtime
+surprise) and is a **decision-returning** callback — retry policy lives in the
+application, not in Continuum:
+
+```java
+public interface RetryHandler {
+
+    RetryDecision onTimeout(ExpiredComputation computation);
+
+    sealed interface RetryDecision {
+        record Redispatched(Instant newDeadline) implements RetryDecision {}
+        record Abandon(String message) implements RetryDecision {}
+    }
+}
+```
+
+`ExpiredComputation` carries kind, `attemptCount`, `invocationId`,
+`dispatchPayload`, `metadata`, and the expired deadline — everything needed to
+decide and to re-dispatch, so the handler is stateless and any JVM's reaper can
+run it against a computation created by a long-dead process.
+
 For each pending computation past its deadline (spec §29):
 
 - Already terminal → skip (races with completion are safe: completion is
   first-wins atomic).
 - `NON_RETRYABLE` → complete as `Failure(TIMEOUT_NON_RETRYABLE)` through the
-  normal completion path (outbox fan-out included).
-- `RETRYABLE` and attempts remain → invoke the application's
-  `RetryHandler.retry(computation)` with the same `InvocationId`, increment the
-  attempt count, and push the deadline forward by a configurable extension.
-- `RETRYABLE` and attempts exhausted (configurable `maxAttempts` on the reaper) →
-  complete as `Failure(TIMEOUT_RETRY_EXHAUSTED)`.
+  normal completion path (outbox fan-out included). The handler is never
+  consulted — "never re-request this work" is a guarantee Continuum enforces
+  as data (`RetrySemantics`), not a convention a handler could violate.
+- `RETRYABLE` → call `onTimeout`:
+  - `Redispatched(newDeadline)` means the handler has re-dispatched the work
+    (same `InvocationId`); Continuum extends the deadline and increments
+    `attemptCount` atomically.
+  - `Abandon(message)` → complete as `Failure(TIMEOUT_RETRY_EXHAUSTED, message)`.
+  - Handler exception → no decision: leave the computation untouched and log;
+    the next `pump()` retries the handler (bounded by pump cadence — no hot
+    loop).
 
-Duplicate retry requests are possible (at-least-once) and are made idempotent by
-the stable `InvocationId` (spec §31).
+Retry state and policy are deliberately split: **`attemptCount` is the only
+retry state Continuum persists** (on the computation record, bumped atomically
+with the deadline extension). Attempt limits and backoff are policy computed
+inside the handler from durable inputs — e.g.
+`attemptCount >= 3 ? Abandon : Redispatched(now + timeout)`, with any backoff
+curve expressed through the returned `newDeadline`. Per-computation budgets can
+ride in `metadata`. Note that timeout-paced retries are self-throttling: attempt
+N+1 cannot occur until attempt N's full timeout has elapsed, so no separate
+backoff mechanism is built in.
+
+Duplicate retry requests are possible (at-least-once, e.g. two nodes pumping
+concurrently) and are made idempotent by the stable `InvocationId` (spec §31).
+If no reaper is ever pumped, no correctness property is lost — expired
+computations simply remain pending (liveness only).
 
 ## 4. Persistence SPI (`org.jwcarman.continuum.spi`)
 
@@ -167,7 +222,9 @@ PostgreSQL over plain JDBC (`javax.sql.DataSource`; no Spring):
 - The specification's three tables — `continuum_computation`,
   `continuum_continuation`, `continuum_outbox` — with DDL shipped as a classpath
   resource (`continuum-postgresql.sql`). No migration tooling; applications own
-  schema management.
+  schema management. The computation table extends the specification's sketch
+  with the retry columns: `retry_semantics`, `invocation_id`,
+  `dispatch_payload`, `attempt_count`, and `metadata`.
 - The provider manages its own transactions (`autoCommit=false`,
   commit/rollback per SPI operation).
 - Completion and registration lock the computation row with
