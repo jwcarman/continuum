@@ -59,12 +59,12 @@ continuum_computation   (pending only — presence means pending)
 continuum_continuation  (id, computation_id, payload, created_at)
 
 continuum_result        (computation_id, kind, outcome_type, outcome_payload,
-                         detail_kind, message, deadline_at, attempt_count,
+                         expiry_kind, message, deadline_at, attempt_count,
                          created_at, completed_at)
 
 continuum_outbox        (id, computation_id, continuation_id, kind,
                          continuation_payload, outcome_type, outcome_payload,
-                         detail_kind, message, available_at, claimed_by,
+                         expiry_kind, message, available_at, claimed_by,
                          claimed_until, attempt_count, created_at)
 ```
 
@@ -134,18 +134,20 @@ Consequences:
   ```java
   public sealed interface Outcome {
       record Success(byte[] payload) implements Outcome {}
-      record Failure(FailureInfo failure) implements Outcome {}       // producer reported failure
+      record Failure(String message) implements Outcome {}            // producer reported failure
       record Expired(ExpiryKind kind, String message) implements Outcome {} // deadline passed, retries done
   }
   public enum ExpiryKind { RETRY_DISALLOWED, RETRY_EXHAUSTED }
-  public record FailureInfo(FailureKind kind, String message) {}
-  public enum FailureKind { EXECUTION_FAILED, INFRASTRUCTURE_FAILURE }
   ```
 
   `Expired` is minted only by timeout processing: `Continuum.complete()`
   rejects it with `IllegalArgumentException` (the client pump methods write it
-  through the SPI). No `TIMEOUT_*` failure kinds — one encoding, no
-  status-vs-outcome disagreement possible.
+  through the SPI). `Failure` carries only the producer's message — no
+  `FailureInfo`/`FailureKind` taxonomy: `Expired` keeps a kind because
+  Continuum mints both values and consumers branch on them; a producer's
+  failure classification is app vocabulary, and genuinely structured error
+  data belongs inside the app's own result type `R` (e.g. a sealed
+  success/error), not in Continuum's envelope.
 - `ComputationStatus` — `PENDING`, `COMPLETED`, `FAILED`, `EXPIRED`; derived:
   pending table → `PENDING`, otherwise a 1:1 reading of the result row's
   outcome arm.
@@ -251,7 +253,7 @@ TypedRegistration<R> r = toolCalls.register(computationId, otherContinuation);
 ```
 
 All built on the raw byte[] API. `TypedOutcome<R>` mirrors `Outcome`:
-`Success<R>(R value)` | `Failure<R>(FailureInfo)` | `Expired<R>(ExpiryKind,
+`Success<R>(R value)` | `Failure<R>(String)` | `Expired<R>(ExpiryKind,
 String)`; `TypedRegistration<R>` is `Registered(ContinuationId)` |
 `Resolved(TypedOutcome<R>)`.
 
@@ -280,7 +282,7 @@ is the host's own machinery, fixed-delay recommended:
 scheduler.scheduleWithFixedDelay(() ->
     toolCalls.deliverResults(25, (cont, outcome) -> switch (outcome) {
         case Success<ToolCallResult>(var result) -> backlog.recordResult(cont, result);
-        case Failure<ToolCallResult>(var failure) -> backlog.recordFailure(cont, failure);
+        case Failure<ToolCallResult>(var message) -> backlog.recordFailure(cont, message);
         case Expired<ToolCallResult>(var kind, var msg) -> backlog.recordTimeout(cont, kind, msg);
     }), 0, 1, TimeUnit.SECONDS);
 
