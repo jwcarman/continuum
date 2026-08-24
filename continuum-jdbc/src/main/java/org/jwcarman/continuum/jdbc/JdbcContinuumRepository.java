@@ -52,6 +52,20 @@ import org.jwcarman.continuum.spi.StoredContinuation;
  */
 public final class JdbcContinuumRepository implements ContinuumRepository {
 
+  private static final String ID_COLUMN = "id";
+  private static final String KIND_COLUMN = "kind";
+  private static final String COMPUTATION_ID_COLUMN = "computation_id";
+  private static final String CONTINUATION_ID_COLUMN = "continuation_id";
+  private static final String CONTINUATION_PAYLOAD_COLUMN = "continuation_payload";
+  private static final String PAYLOAD_COLUMN = "payload";
+  private static final String DISPATCH_PAYLOAD_COLUMN = "dispatch_payload";
+  private static final String OUTCOME_TYPE_COLUMN = "outcome_type";
+  private static final String OUTCOME_PAYLOAD_COLUMN = "outcome_payload";
+  private static final String EXPIRY_KIND_COLUMN = "expiry_kind";
+  private static final String MESSAGE_COLUMN = "message";
+  private static final String DEADLINE_AT_COLUMN = "deadline_at";
+  private static final String SUBMITTED_AT_COLUMN = "submitted_at";
+  private static final String COMPLETED_AT_COLUMN = "completed_at";
   private static final String ATTEMPT_COUNT_COLUMN = "attempt_count";
 
   private final DataSource dataSource;
@@ -237,11 +251,11 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
       throws SQLException {
     return new Computation(
         id,
-        new ComputationKind(row.getString("kind")),
+        new ComputationKind(row.getString(KIND_COLUMN)),
         ComputationStatus.PENDING,
-        row.getTimestamp("submitted_at").toInstant(),
-        row.getTimestamp("deadline_at").toInstant(),
-        row.getBytes("dispatch_payload"),
+        row.getTimestamp(SUBMITTED_AT_COLUMN).toInstant(),
+        row.getTimestamp(DEADLINE_AT_COLUMN).toInstant(),
+        row.getBytes(DISPATCH_PAYLOAD_COLUMN),
         row.getInt(ATTEMPT_COUNT_COLUMN),
         null);
   }
@@ -257,7 +271,8 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
         while (row.next()) {
           continuations.add(
               new StoredContinuation(
-                  new ContinuationId(row.getObject("id", UUID.class)), row.getBytes("payload")));
+                  new ContinuationId(row.getObject(ID_COLUMN, UUID.class)),
+                  row.getBytes(PAYLOAD_COLUMN)));
         }
       }
     }
@@ -305,12 +320,12 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
   }
 
   private static Outcome readOutcome(ResultSet row) throws SQLException {
-    return switch (row.getString("outcome_type")) {
-      case "SUCCESS" -> Outcome.success(row.getBytes("outcome_payload"));
-      case "FAILURE" -> Outcome.failure(row.getString("message"));
+    return switch (row.getString(OUTCOME_TYPE_COLUMN)) {
+      case "SUCCESS" -> Outcome.success(row.getBytes(OUTCOME_PAYLOAD_COLUMN));
+      case "FAILURE" -> Outcome.failure(row.getString(MESSAGE_COLUMN));
       case "EXPIRED" ->
           Outcome.expired(
-              ExpiryKind.valueOf(row.getString("expiry_kind")), row.getString("message"));
+              ExpiryKind.valueOf(row.getString(EXPIRY_KIND_COLUMN)), row.getString(MESSAGE_COLUMN));
       default -> throw new ContinuumPersistenceException("unknown outcome_type");
     };
   }
@@ -344,10 +359,10 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
               return Optional.of(
                   new Computation(
                       id,
-                      new ComputationKind(row.getString("kind")),
+                      new ComputationKind(row.getString(KIND_COLUMN)),
                       Outcome.statusOf(outcome),
-                      row.getTimestamp("submitted_at").toInstant(),
-                      row.getTimestamp("deadline_at").toInstant(),
+                      row.getTimestamp(SUBMITTED_AT_COLUMN).toInstant(),
+                      row.getTimestamp(DEADLINE_AT_COLUMN).toInstant(),
                       null,
                       row.getInt(ATTEMPT_COUNT_COLUMN),
                       outcome));
@@ -379,15 +394,15 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
               while (row.next()) {
                 claimed.add(
                     new ClaimedDelivery(
-                        new DeliveryId(row.getObject("id", UUID.class)),
+                        new DeliveryId(row.getObject(ID_COLUMN, UUID.class)),
                         new CompletionDelivery(
-                            new ComputationId(row.getObject("computation_id", UUID.class)),
+                            new ComputationId(row.getObject(COMPUTATION_ID_COLUMN, UUID.class)),
                             kind,
-                            new ContinuationId(row.getObject("continuation_id", UUID.class)),
-                            row.getBytes("continuation_payload"),
+                            new ContinuationId(row.getObject(CONTINUATION_ID_COLUMN, UUID.class)),
+                            row.getBytes(CONTINUATION_PAYLOAD_COLUMN),
                             readOutcome(row),
-                            row.getTimestamp("submitted_at").toInstant(),
-                            row.getTimestamp("completed_at").toInstant()),
+                            row.getTimestamp(SUBMITTED_AT_COLUMN).toInstant(),
+                            row.getTimestamp(COMPLETED_AT_COLUMN).toInstant()),
                         row.getInt(ATTEMPT_COUNT_COLUMN)));
               }
             }
@@ -452,7 +467,8 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
             try (ResultSet row = select.executeQuery()) {
               while (row.next()) {
                 expired.add(
-                    pendingComputation(new ComputationId(row.getObject("id", UUID.class)), row));
+                    pendingComputation(
+                        new ComputationId(row.getObject(ID_COLUMN, UUID.class)), row));
               }
             }
           }
