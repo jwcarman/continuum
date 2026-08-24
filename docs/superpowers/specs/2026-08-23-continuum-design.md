@@ -243,6 +243,13 @@ The library never owns a thread or scheduler ("pumped" model — the owning
 application calls `pump()` on whatever cadence/scheduler it likes). No correctness
 property depends on a pump running (spec I9); pumps only advance liveness.
 
+Scheduling is therefore a one-liner in the host's own machinery — e.g.
+`scheduler.scheduleWithFixedDelay(deliveryPump::pump, 0, 1, SECONDS)`, Spring
+`@Scheduled`, Quartz, or a cron-triggered endpoint. Fixed-*delay* is the
+sensible default (a slow batch can't stack overlapping runs on one node),
+though overlap is safe regardless: leases and `SKIP LOCKED` make concurrent
+pumps correct by design.
+
 ### DeliveryPump
 
 ```java
