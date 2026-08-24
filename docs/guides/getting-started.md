@@ -6,7 +6,7 @@
 <dependency>
     <groupId>org.jwcarman.continuum</groupId>
     <artifactId>continuum-core</artifactId>
-    <version>0.2.0</version>
+    <version>0.3.0</version>
 </dependency>
 ```
 
@@ -20,7 +20,7 @@ The examples below use the Jackson 3 backend:
 <dependency>
     <groupId>org.jwcarman.codec</groupId>
     <artifactId>codec-jackson</artifactId>
-    <version>0.3.0</version>
+    <version>0.4.0</version>
 </dependency>
 ```
 

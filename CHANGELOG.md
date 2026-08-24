@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-24
+
 ### Breaking changes
 
 - **`deliverResults` now hands the consumer one `TypedDelivery` instead of two
@@ -32,6 +34,20 @@ All notable changes to this project will be documented in this file.
 - **`ClaimedDelivery.attemptCount` is now `deliveryAttempt`.** `attemptCount`
   meant *dispatch* attempts on `Computation`/`ExpiryContext` and *delivery*
   attempts here — one word, two meanings. `attemptCount` now has exactly one.
+
+### Changed
+
+- Upgraded to codec 0.4.0, whose BOM no longer re-exports Spring Boot's
+  dependency management. Continuum declares `codec-core` directly rather than
+  importing `codec-bom`, so this changes nothing here — but a project importing
+  both BOMs was still exposed from the codec side until now.
+
+### Fixed
+
+- `deliverResults` javadoc states the acknowledge/release contract outright:
+  returning acknowledges the delivery, throwing releases it with backoff. The
+  consume-without-acting case — returning to drop a delivery you have decided is
+  stale — was previously only inferable from prose.
 
 
 ## [0.2.0] - 2026-08-24
@@ -107,5 +123,6 @@ means only "this row was written".
 See the [documentation](https://jwcarman.github.io/continuum/) for the full
 tour.
 
+[0.3.0]: https://github.com/jwcarman/continuum/releases/tag/0.3.0
 [0.2.0]: https://github.com/jwcarman/continuum/releases/tag/0.2.0
 [0.1.0]: https://github.com/jwcarman/continuum/releases/tag/0.1.0
