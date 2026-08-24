@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -196,12 +195,10 @@ class ClientPumpTest {
 
       verify(repository)
           .complete(
-              eq(computation.id()),
-              eq(
-                  Outcome.expired(
-                      ExpiryKind.RETRY_DISALLOWED,
-                      "deadline " + computation.deadline() + " passed")),
-              eq(NOW));
+              computation.id(),
+              Outcome.expired(
+                  ExpiryKind.RETRY_DISALLOWED, "deadline " + computation.deadline() + " passed"),
+              NOW);
     }
 
     @Test

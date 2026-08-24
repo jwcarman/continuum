@@ -108,8 +108,10 @@ class ValueTypesTest {
     void computations_compare_dispatch_payloads_by_content() {
       var a = computation(new byte[] {1, 2}, null);
       var b = computation(new byte[] {1, 2}, null);
-      assertThat(a).isEqualTo(b).hasSameHashCodeAs(b);
-      assertThat(a).isNotEqualTo(computation(new byte[] {9}, null));
+      assertThat(a)
+          .isEqualTo(b)
+          .hasSameHashCodeAs(b)
+          .isNotEqualTo(computation(new byte[] {9}, null));
       assertThat(a.toString()).contains("PENDING");
     }
 
@@ -160,9 +162,10 @@ class ValueTypesTest {
     @Test
     void success_is_never_equal_to_another_arm_or_type() {
       var success = Outcome.success(new byte[] {1});
-      assertThat(success).isNotEqualTo(Outcome.failure("f"));
-      assertThat(success).isNotEqualTo("not an outcome");
-      assertThat(success).hasSameHashCodeAs(Outcome.success(new byte[] {1}));
+      assertThat(success)
+          .isNotEqualTo(Outcome.failure("f"))
+          .isNotEqualTo("not an outcome")
+          .hasSameHashCodeAs(Outcome.success(new byte[] {1}));
     }
 
     @Test
