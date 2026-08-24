@@ -209,9 +209,15 @@ router, p -> p.batchSize(...).lease(...).workerId(...))`, and
   escape hatch for decisions the config cannot express (attempt-dependent
   backoff, circuit breakers) — the same relationship `ContinuumClient` has
   to raw `Continuum`. A client configured with **no** `Retry` creates
-  `NON_RETRYABLE` computations — the presence of a `Retry` is what
+  `NON_RETRYABLE` computations — the presence of a working `Retry` is what
   `RETRYABLE` means at the typed layer; the `RetrySemantics` enum survives
-  only at the wire/storage level.
+  only at the wire/storage level. `Retry.none()` spells the default out: a
+  null-object marker the client config maps to `NON_RETRYABLE` — not a
+  `Retry` returning `NotRetried`, so timeouts fail as
+  `TIMEOUT_NON_RETRYABLE` without any handler consultation, preserving the
+  "never-redispatch is enforced as data" guarantee. The factory set is a
+  closed algebra: `Retry.none()` (never), `Retry.of(customizer)`
+  (declarative), implement `Retry<D>` (full control).
 
 - `DeliveryRouter` — the pump cannot be generic (it drains a mixed-kind
   outbox), so a router dispatches each `CompletionDelivery` by kind to a
