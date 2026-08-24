@@ -120,7 +120,7 @@ scheduler.scheduleWithFixedDelay(() ->
     }), 0, 1, TimeUnit.SECONDS);
 
 scheduler.scheduleWithFixedDelay(() ->
-    toolCalls.reapExpiredComputations(BatchSize.of(12), Retry.of(r -> r
+    toolCalls.retryExpiredComputations(BatchSize.of(12), Retry.of(r -> r
         .atMost(3)
         .handler((descriptor, ctx) -> toolRuntime.dispatch(descriptor, ctx.computationId())))),
     5, 15, TimeUnit.SECONDS);
@@ -140,7 +140,7 @@ no `Retry` and expires overdue computations as `RETRY_DISALLOWED`:
 ```java
 var approvals = continuum.client("approval", Decision.class, ApprovalContinuation.class,
     cfg -> cfg.codecs(codecs).deadline(Duration.ofDays(3)));
-approvals.reapExpiredComputations(BatchSize.of(10));
+approvals.failExpiredComputations(BatchSize.of(10));
 ```
 
 ## Design highlights

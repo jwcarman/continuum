@@ -31,7 +31,7 @@ import org.jwcarman.continuum.api.TypedRegistration;
 
 /**
  * The typed client for a <em>non-retryable</em> kind: computations carry no dispatch payload, so
- * nothing can ever be redispatched and {@link #reapExpiredComputations(BatchSize)} expires overdue
+ * nothing can ever be redispatched and {@link #failExpiredComputations(BatchSize)} expires overdue
  * computations unconditionally as {@code Expired(RETRY_DISALLOWED, ...)}. Minted by {@code
  * continuum.client(kind, resultType, continuationType, customizer)}.
  *
@@ -76,7 +76,7 @@ public final class ContinuumClient<R, C> {
     return support.deliverResults(batchSize, lease, backoff, consumer);
   }
 
-  public int reapExpiredComputations(BatchSize batchSize) {
+  public int failExpiredComputations(BatchSize batchSize) {
     int reaped = 0;
     for (Computation computation : support.findExpired(batchSize)) {
       support.failExpired(

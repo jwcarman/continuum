@@ -143,7 +143,7 @@ class ClientMintingTest {
     }
 
     @Test
-    void one_shot_create_never_carries_a_dispatch_payload() {
+    void non_retryable_create_never_carries_a_dispatch_payload() {
       when(continuum.create(any()))
           .thenAnswer(
               invocation -> {

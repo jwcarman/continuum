@@ -200,7 +200,7 @@ class ClientPumpTest {
 
       Retry<String> retry =
           Retry.of(r -> r.timeout(Duration.ofSeconds(90)).handler((dispatch, ctx) -> {}));
-      assertThat(retryable().reapExpiredComputations(BatchSize.of(10), retry)).isEqualTo(1);
+      assertThat(retryable().retryExpiredComputations(BatchSize.of(10), retry)).isEqualTo(1);
 
       verify(repository).extendDeadline(computation.id(), NOW.plus(Duration.ofSeconds(90)), 2);
     }
@@ -211,7 +211,7 @@ class ClientPumpTest {
       when(repository.findExpired(KIND, NOW, 10)).thenReturn(List.of(computation));
 
       Retry<String> retry = Retry.of(r -> r.handler((dispatch, ctx) -> {}));
-      retryable().reapExpiredComputations(BatchSize.of(10), retry);
+      retryable().retryExpiredComputations(BatchSize.of(10), retry);
 
       verify(repository).extendDeadline(computation.id(), NOW.plus(Duration.ofMinutes(5)), 3);
     }
@@ -222,7 +222,7 @@ class ClientPumpTest {
       when(repository.findExpired(KIND, NOW, 10)).thenReturn(List.of(computation));
 
       retryable()
-          .reapExpiredComputations(
+          .retryExpiredComputations(
               BatchSize.of(10), (dispatch, ctx) -> Retry.RetryResult.notRetried("circuit open"));
 
       verify(repository)
@@ -231,12 +231,12 @@ class ClientPumpTest {
     }
 
     @Test
-    void payload_less_computation_reached_by_retryable_reap_expires_as_disallowed() {
+    void payload_less_computation_reached_by_retry_pump_expires_as_disallowed() {
       var computation = expired(null, 1);
       when(repository.findExpired(KIND, NOW, 10)).thenReturn(List.of(computation));
 
       Retry<String> retry = Retry.of(r -> r.handler((dispatch, ctx) -> {}));
-      assertThat(retryable().reapExpiredComputations(BatchSize.of(10), retry)).isEqualTo(1);
+      assertThat(retryable().retryExpiredComputations(BatchSize.of(10), retry)).isEqualTo(1);
 
       verify(repository)
           .complete(
@@ -253,7 +253,7 @@ class ClientPumpTest {
 
       int reaped =
           retryable()
-              .reapExpiredComputations(
+              .retryExpiredComputations(
                   BatchSize.of(10),
                   (dispatch, ctx) -> {
                     throw new IllegalStateException("dispatch transport down");
@@ -265,9 +265,9 @@ class ClientPumpTest {
     }
 
     @Test
-    void reap_requires_a_retry() {
+    void retry_pump_requires_a_retry() {
       assertThatNullPointerException()
-          .isThrownBy(() -> retryable().reapExpiredComputations(BatchSize.of(10), null));
+          .isThrownBy(() -> retryable().retryExpiredComputations(BatchSize.of(10), null));
     }
   }
 
@@ -464,9 +464,9 @@ class ClientPumpTest {
   }
 
   @Nested
-  class One_shot_shape {
+  class Non_retryable_shape {
     @Test
-    void one_shot_reap_expires_every_overdue_computation() {
+    void fail_pump_expires_every_overdue_computation() {
       var first = expired(null, 1);
       var second = expired(null, 1);
       when(repository.findExpired(any(), any(), anyInt())).thenReturn(List.of(first, second));
@@ -481,7 +481,7 @@ class ClientPumpTest {
                       .continuationCodec(ClientMintingTest.STRINGS)
                       .deadline(Duration.ofMinutes(5)));
 
-      assertThat(client.reapExpiredComputations(BatchSize.of(10))).isEqualTo(2);
+      assertThat(client.failExpiredComputations(BatchSize.of(10))).isEqualTo(2);
       verify(repository)
           .complete(
               first.id(),
@@ -497,7 +497,7 @@ class ClientPumpTest {
     }
 
     @Test
-    void one_shot_register_surfaces_the_registered_arm() {
+    void register_surfaces_the_registered_arm() {
       var client =
           continuum.client(
               "tool",
@@ -516,7 +516,7 @@ class ClientPumpTest {
     }
 
     @Test
-    void one_shot_create_honors_a_deadline_override_and_complete_encodes_success() {
+    void create_honors_a_deadline_override_and_complete_encodes_success() {
       when(continuum.create(any()))
           .thenAnswer(
               invocation -> {
@@ -554,7 +554,7 @@ class ClientPumpTest {
     }
 
     @Test
-    void one_shot_explicit_lease_and_purge_overloads_work() {
+    void explicit_lease_and_purge_overloads_work() {
       when(repository.claimDeliveries(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
       when(repository.purgeResults(any(), any(), anyInt())).thenReturn(2);
       var client =
@@ -578,7 +578,7 @@ class ClientPumpTest {
     }
 
     @Test
-    void one_shot_fail_reports_a_producer_failure() {
+    void fail_reports_a_producer_failure() {
       var client =
           continuum.client(
               "tool",

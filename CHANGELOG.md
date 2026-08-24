@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
   `continuum.client(...)` customizers, with pluggable serialization through
   `org.jwcarman.codec`.
 - Application-pumped batch methods: `deliverResults`,
-  `reapExpiredComputations` (retry-consulting and always-fail shapes),
+  `retryExpiredComputations` / `failExpiredComputations`,
   `purgeExpiredResults`; `Retry.of(...)` declarative retry customizer.
 - Persistence SPI (`ContinuumRepository`) with presence-means-pending
   semantics and kind-scoped pumping operations.

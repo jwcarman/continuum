@@ -442,7 +442,7 @@ public abstract class ContinuumTck {
                   .deadline(Duration.ofMinutes(5)));
     }
 
-    private ContinuumClient<String, String> oneShot() {
+    private ContinuumClient<String, String> nonRetryable() {
       return continuum.client(
           "typed-approval",
           String.class,
@@ -493,14 +493,14 @@ public abstract class ContinuumTck {
     }
 
     @Test
-    void reap_consults_the_retry_and_extends_the_deadline() {
+    void retry_pump_consults_the_retry_and_extends_the_deadline() {
       var client = retryable();
       var computation = client.create("route-me", "dispatch-me");
       instants.advance(Duration.ofMinutes(6));
 
       var redispatched = new AtomicReference<String>();
       int reaped =
-          client.reapExpiredComputations(
+          client.retryExpiredComputations(
               BatchSize.of(10),
               Retry.of(
                   r ->
@@ -527,7 +527,7 @@ public abstract class ContinuumTck {
       var retry = Retry.<String>of(r -> r.atMost(1).handler((dispatch, ctx) -> {}));
 
       instants.advance(Duration.ofMinutes(6));
-      assertThat(client.reapExpiredComputations(BatchSize.of(10), retry)).isEqualTo(1);
+      assertThat(client.retryExpiredComputations(BatchSize.of(10), retry)).isEqualTo(1);
 
       assertThat(continuum.find(computation.id()).orElseThrow().status())
           .isEqualTo(ComputationStatus.EXPIRED);
@@ -540,12 +540,12 @@ public abstract class ContinuumTck {
     }
 
     @Test
-    void one_shot_reap_always_expires_with_retry_disallowed() {
-      var client = oneShot();
+    void fail_pump_always_expires_with_retry_disallowed() {
+      var client = nonRetryable();
       var computation = client.create("route-me");
       instants.advance(Duration.ofMinutes(6));
 
-      assertThat(client.reapExpiredComputations(BatchSize.of(10))).isEqualTo(1);
+      assertThat(client.failExpiredComputations(BatchSize.of(10))).isEqualTo(1);
 
       var found = continuum.find(computation.id()).orElseThrow();
       assertThat(found.status()).isEqualTo(ComputationStatus.EXPIRED);
@@ -557,7 +557,7 @@ public abstract class ContinuumTck {
 
     @Test
     void purge_via_the_client_uses_call_site_ttl() {
-      var client = oneShot();
+      var client = nonRetryable();
       var computation = client.create("route-me");
       client.complete(computation.id(), "done");
       instants.advance(Duration.ofHours(2));

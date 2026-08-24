@@ -15,7 +15,7 @@ scheduler.scheduleWithFixedDelay(() ->
     }), 0, 1, TimeUnit.SECONDS);
 
 scheduler.scheduleWithFixedDelay(() ->
-    toolCalls.reapExpiredComputations(BatchSize.of(12), Retry.of(r -> r
+    toolCalls.retryExpiredComputations(BatchSize.of(12), Retry.of(r -> r
         .atMost(3)
         .handler((descriptor, ctx) -> toolRuntime.dispatch(descriptor, ctx.computationId())))),
     5, 15, TimeUnit.SECONDS);
@@ -49,13 +49,15 @@ Every call returns the count processed — the drain signal:
 `while (client.deliverResults(...) > 0)` chews through a backlog after
 downtime, batch by batch.
 
-## Reaping
+## Expiring
 
-`reapExpiredComputations` sweeps this kind's overdue computations to their
-correct fate. On a retryable client it requires a
-[`Retry`](../concepts/retry.md); on a non-retryable client it takes none and
-expires unconditionally. Each pump handles one bounded batch — after an
-outage, redispatch is paced instead of thundering.
+Each client shape has exactly one expiry pump — the verb tells you what
+expiry means for that kind. `retryExpiredComputations` (on
+`RetryableContinuumClient`) consults the supplied
+[`Retry`](../concepts/retry.md) for every overdue computation;
+`failExpiredComputations` (on `ContinuumClient`) expires them
+unconditionally as `RETRY_DISALLOWED`. Each pump handles one bounded batch —
+after an outage, redispatch is paced instead of thundering.
 
 ## Purging
 

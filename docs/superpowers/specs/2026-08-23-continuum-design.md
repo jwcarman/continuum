@@ -292,7 +292,7 @@ public final class ContinuumClient<R, C> {          // continuum.client(kind, R,
     CompletionResult fail(ComputationId id, String message);
     TypedRegistration<R> register(ComputationId id, C continuation);
     int deliverResults(int batchSize, BiConsumer<C, TypedOutcome<R>> consumer);
-    int reapExpiredComputations(int batchSize);     // always Expired(RETRY_DISALLOWED, ...)
+    int retryExpiredComputations / failExpiredComputations(int batchSize);     // always Expired(RETRY_DISALLOWED, ...)
     int purgeExpiredResults(int batchSize, Duration ttl);
     ComputationKind kind();
 }
@@ -303,7 +303,7 @@ public final class RetryableContinuumClient<R, C, D> {  // continuum.client(kind
     CompletionResult fail(ComputationId id, String message);
     TypedRegistration<R> register(ComputationId id, C continuation);
     int deliverResults(int batchSize, BiConsumer<C, TypedOutcome<R>> consumer);
-    int reapExpiredComputations(int batchSize, Retry<D> retry);
+    int retryExpiredComputations / failExpiredComputations(int batchSize, Retry<D> retry);
     int purgeExpiredResults(int batchSize, Duration ttl);
     ComputationKind kind();
 }
@@ -326,7 +326,7 @@ scheduler.scheduleWithFixedDelay(() ->
     }), 0, 1, TimeUnit.SECONDS);
 
 scheduler.scheduleWithFixedDelay(() ->
-    toolCalls.reapExpiredComputations(12, Retry.of(r -> r
+    toolCalls.retryExpiredComputations / failExpiredComputations(12, Retry.of(r -> r
         .atMost(3)
         .handler((toolCall, ctx) -> toolRuntime.dispatch(toolCall, ctx.computationId())))),
     5, 15, TimeUnit.SECONDS);
@@ -346,7 +346,7 @@ Semantics:
   (spec §29: failures follow the same delivery path); a continuation is
   guaranteed exactly one eventual delivery *whatever* happened, so there is
   no separate timeout-notification channel to miss.
-- **`reapExpiredComputations`** — one activity, two shapes; a client has
+- **`retryExpiredComputations / failExpiredComputations`** — one activity, two shapes; a client has
   exactly one of them, chosen by its type shape, so "which do I call" is
   never a runtime decision. The three-type shape: for each of this kind's
   pending computations past deadline, invoke the supplied `Retry<D>` with the decoded

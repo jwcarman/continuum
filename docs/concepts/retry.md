@@ -1,8 +1,8 @@
 # Expiry & Retry
 
 Every computation has a deadline. Timeout detection is durable — it never
-depends on an in-memory timer surviving — and is driven by pumping
-`reapExpiredComputations` (see [Pumping](../guides/pumping.md)).
+depends on an in-memory timer surviving — and is driven by pumping the expiry
+methods (see [Pumping](../guides/pumping.md)).
 
 ## Retryability is data
 
