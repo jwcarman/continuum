@@ -39,8 +39,8 @@ a separate dependency:
 </dependency>
 ```
 
-(`codec-gson` and `codec-protobuf` work the same way, or implement
-`Codec<T>` directly.) Continuum logs through `slf4j-api` only — add the
+(`codec-jackson2` covers Jackson 2 applications; `codec-gson` and
+`codec-protobuf` work the same way, or implement `Codec<T>` directly.) Continuum logs through `slf4j-api` only — add the
 SLF4J provider your application already uses (e.g. `logback-classic`) or
 expect SLF4J's NOP warning.
 
