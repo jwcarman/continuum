@@ -34,6 +34,10 @@
             <artifactId>continuum-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.jwcarman.codec</groupId>
+            <artifactId>codec-core</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>compile</scope>

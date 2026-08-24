@@ -71,6 +71,8 @@
         <spring-boot.version>4.0.5</spring-boot.version>
 
         <surefire.plugin.version>3.5.4</surefire.plugin.version>
+        <dependency.plugin.version>3.11.0</dependency.plugin.version>
+        <enforcer.plugin.version>3.6.2</enforcer.plugin.version>
         <spotless.version>3.4.0</spotless.version>
         <gpg.plugin.version>3.2.8</gpg.plugin.version>
         <javadoc.plugin.version>3.12.0</javadoc.plugin.version>
@@ -399,6 +401,82 @@
                                     <formats>
                                         <format>XML</format>
                                     </formats>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <version>${dependency.plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>analyze-dependencies</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>analyze-only</goal>
+                                </goals>
+                                <configuration>
+                                    <failOnWarning>true</failOnWarning>
+                                    <ignoredUsedUndeclaredDependencies>
+                                        <!-- Aggregator is declared deliberately; tests compile against junit-jupiter-api. -->
+                                        <ignoredUsedUndeclaredDependency>org.junit.jupiter:junit-jupiter-api</ignoredUsedUndeclaredDependency>
+                                        <!-- Only continuum-autoconfigure's tests reference spring-boot classes
+                                             directly, but it is a required compile-scope transitive of
+                                             spring-boot-autoconfigure, so it is reported both here and as
+                                             non-test-scoped. -->
+                                        <ignoredUsedUndeclaredDependency>org.springframework.boot:spring-boot</ignoredUsedUndeclaredDependency>
+                                    </ignoredUsedUndeclaredDependencies>
+                                    <ignoredNonTestScopedDependencies>
+                                        <ignoredNonTestScopedDependency>org.springframework.boot:spring-boot</ignoredNonTestScopedDependency>
+                                    </ignoredNonTestScopedDependencies>
+                                    <ignoredUnusedDeclaredDependencies>
+                                        <!-- The junit-jupiter aggregator supplies the engine at test runtime. -->
+                                        <ignoredUnusedDeclaredDependency>org.junit.jupiter:junit-jupiter</ignoredUnusedDeclaredDependency>
+                                        <!-- Both are attached via the parent's surefire -javaagent argLine, which
+                                             applies to every module, so they must be on every module's test path
+                                             even where no test imports them. -->
+                                        <ignoredUnusedDeclaredDependency>net.bytebuddy:byte-buddy-agent</ignoredUnusedDeclaredDependency>
+                                        <ignoredUnusedDeclaredDependency>org.mockito:mockito-core</ignoredUnusedDeclaredDependency>
+                                        <!-- The slf4j binding for tests: required on the runtime classpath, never imported. -->
+                                        <ignoredUnusedDeclaredDependency>ch.qos.logback:logback-classic</ignoredUnusedDeclaredDependency>
+                                        <!-- Embedded database discovered at test runtime by Boot's DataSource
+                                             auto-configuration; no test imports an H2 class. -->
+                                        <ignoredUnusedDeclaredDependency>com.h2database:h2</ignoredUnusedDeclaredDependency>
+                                        <!-- continuum-spring-boot-starter ships no code: it is dependencies-only
+                                             by design, so everything it declares is "unused" by definition. That
+                                             also leaves it with the parent's inherited test dependencies and no
+                                             tests to use them. -->
+                                        <ignoredUnusedDeclaredDependency>org.jwcarman.continuum:continuum-core</ignoredUnusedDeclaredDependency>
+                                        <ignoredUnusedDeclaredDependency>org.jwcarman.continuum:continuum-memory</ignoredUnusedDeclaredDependency>
+                                        <ignoredUnusedDeclaredDependency>org.jwcarman.continuum:continuum-autoconfigure</ignoredUnusedDeclaredDependency>
+                                        <ignoredUnusedDeclaredDependency>org.assertj:assertj-core</ignoredUnusedDeclaredDependency>
+                                    </ignoredUnusedDeclaredDependencies>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-enforcer-plugin</artifactId>
+                        <version>${enforcer.plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>enforce-dependency-hygiene</id>
+                                <goals>
+                                    <goal>enforce</goal>
+                                </goals>
+                                <configuration>
+                                    <rules>
+                                        <dependencyConvergence/>
+                                        <requireUpperBoundDeps/>
+                                        <banDuplicatePomDependencyVersions/>
+                                        <banDynamicVersions>
+                                            <!-- Bans ranges and LATEST/RELEASE. Snapshots are allowed: the reactor
+                                                 depends on its own SNAPSHOT version during development. -->
+                                            <allowSnapshots>true</allowSnapshots>
+                                        </banDynamicVersions>
+                                    </rules>
                                 </configuration>
                             </execution>
                         </executions>
