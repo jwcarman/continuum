@@ -23,7 +23,7 @@
     <parent>
         <groupId>org.jwcarman.continuum</groupId>
         <artifactId>continuum-parent</artifactId>
-        <version>0.3.0-SNAPSHOT</version>
+        <version>0.4.0-SNAPSHOT</version>
     </parent>
     <artifactId>continuum-autoconfigure</artifactId>
     <name>Continuum Auto-Configuration</name>
