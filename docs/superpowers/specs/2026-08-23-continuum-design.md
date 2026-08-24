@@ -319,7 +319,13 @@ int pump(); // processes at most batchSize claimed deliveries, returns count del
 
 Config knobs (customizer): `batchSize(int)` default 25; `lease(Duration)`
 default 30s; `backoff(Duration)` default 30s; `workerId(String)` default
-generated (`"worker-" + UUID`).
+generated (`"worker-" + UUID`); `kinds(ComputationKind...)` default empty =
+all kinds. Kind scoping enables per-kind pumps on independent schedules
+(`p.kinds(toolCalls.kind())`, pumped every second, beside an approvals pump
+pumped every minute) — isolation and cadence per kind, while the unscoped
+default keeps one pump draining everything. The router is unaffected: a
+scoped pump simply only hands it that kind's deliveries, so one router
+instance serves every pump.
 
 - Claims up to `batchSize` outbox items under a lease.
 - Invokes the application-supplied `DeliveryHandler.handle(CompletionDelivery)`
@@ -344,15 +350,22 @@ naturally instead of thundering. Overlapping reapers are safe: overlap yields a
 duplicate retry request, covered by at-least-once semantics plus the
 idempotency key the app embeds in the dispatch payload.
 
-The reaper also purges expired results each pump (`purgeResults` batch —
-result rows whose `expires_at` has passed). No TTL config lives on the reaper;
-retention was resolved onto each result row at completion.
-
 Config knobs (customizer): `batchSize(int)` default 12 (expired computations
 per pump — small, since each may consult a retry handler) and
-`purgeBatchSize(int)` default 100 (result rows per pump — a cheap indexed
-delete that can take bigger bites). E.g.
-`TimeoutReaper.of(repo, instants, handler, r -> r.batchSize(12).purgeBatchSize(200))`.
+`kinds(ComputationKind...)` default empty = all kinds (per-kind reapers on
+independent schedules, same as the delivery pump).
+
+### ResultPurge
+
+```java
+int pump(); // deletes at most batchSize result rows past expires_at, returns the count
+```
+
+The third scheduled activity, as its own pump so it gets its own cadence
+(purge every ten minutes; reap every fifteen seconds). Policy-free: retention
+was resolved onto each result row as `expires_at` at completion, so the purge
+is a bounded indexed delete. Config knobs: `batchSize(int)` default 100.
+`ResultPurge.of(repo, instants, p -> p.batchSize(200))`.
 
 The `RetryHandler` is a **required constructor argument** of the reaper (no
 global registry to forget; "no handler" is a compile error) and is a
@@ -413,10 +426,11 @@ public interface ContinuumRepository {
     RegistrationOutcome registerContinuation(ComputationId id, StoredContinuation c); // atomic vs completion (I5)
     CompletionOutcome complete(ComputationId id, Outcome outcome, Instant completedAt); // ownership transfer (I7)
     Optional<Computation> findComputation(ComputationId id);   // pending or memoized result
-    List<ClaimedDelivery> claimDeliveries(String workerId, int limit, Duration lease, Instant now);
+    List<ClaimedDelivery> claimDeliveries(
+        String workerId, Set<ComputationKind> kinds, int limit, Duration lease, Instant now);
     void acknowledgeDelivery(DeliveryId id);
     void releaseDelivery(DeliveryId id, Instant retryAt);      // increments delivery attempt count
-    List<Computation> findExpired(Instant now, int limit);
+    List<Computation> findExpired(Set<ComputationKind> kinds, Instant now, int limit);
     void extendDeadline(ComputationId id, Instant newDeadline, int attemptCount);
     int purgeResults(Instant now, int limit);                  // delete result rows past expires_at
 }
@@ -452,6 +466,9 @@ PostgreSQL over plain JDBC (`javax.sql.DataSource`; no Spring):
   (`ALREADY_RESOLVED` / `Resolved(outcome)`) and then to not-found.
 - Outbox claiming uses `FOR UPDATE SKIP LOCKED` so competing consumers never
   block one another.
+- Kind-scoped claiming/expiry filters with `kind = ANY(?)`; composite indexes
+  `(kind, available_at)` on the outbox and `(kind, deadline_at)` on the
+  pending table serve both scoped and unscoped pumps.
 
 ## 9. `continuum-testing` (TCK)
 
