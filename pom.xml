@@ -69,6 +69,7 @@
     </properties>
 
     <modules>
+        <module>continuum-bom</module>
         <module>continuum-core</module>
         <module>continuum-memory</module>
         <module>continuum-testing</module>
