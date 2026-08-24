@@ -81,7 +81,11 @@ Decisions the specification left open:
 2. **ID generation** — random (v4) UUIDs for `ComputationId` and `ContinuationId`.
 3. **Time** — an injected `java.time.InstantSource` (every `Clock` is an
    `InstantSource`; Continuum never needs a `ZoneId`). Tests use fixed/steppable
-   sources.
+   sources. The `Continuum` interface exposes it as `instants()`: there is one
+   time authority per `Continuum` instance, and the typed layer (client
+   creation defaults, the router's retry adapter) derives all
+   `now + timeout` arithmetic from it rather than configuring a second clock —
+   deadlines are computed and compared against the same source.
 4. **Storage and coordination are opaque `byte[]`** end to end — the outcome
    payload, the continuation payload, and the dispatch payload alike. The
    `Continuum` interface is exactly the specification's byte[] contract (§32):
