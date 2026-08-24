@@ -9,16 +9,19 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.continuum.CompletionResult;
 import org.jwcarman.continuum.Computation;
 import org.jwcarman.continuum.ComputationId;
@@ -27,10 +30,14 @@ import org.jwcarman.continuum.ComputationNotFoundException;
 import org.jwcarman.continuum.ComputationRequest;
 import org.jwcarman.continuum.ComputationStatus;
 import org.jwcarman.continuum.Continuum;
+import org.jwcarman.continuum.ContinuumClient;
 import org.jwcarman.continuum.DefaultContinuum;
 import org.jwcarman.continuum.ExpiryKind;
 import org.jwcarman.continuum.Outcome;
 import org.jwcarman.continuum.RegistrationResult;
+import org.jwcarman.continuum.Retry;
+import org.jwcarman.continuum.RetryableContinuumClient;
+import org.jwcarman.continuum.TypedOutcome;
 import org.jwcarman.continuum.spi.ClaimedDelivery;
 import org.jwcarman.continuum.spi.CompletionOutcome;
 import org.jwcarman.continuum.spi.ContinuumRepository;
@@ -379,6 +386,158 @@ public abstract class ContinuumTck {
           .isEqualTo(CompletionOutcome.NOT_FOUND);
       assertThatExceptionOfType(ComputationNotFoundException.class)
           .isThrownBy(() -> continuum.registerContinuation(computation.id(), "x".getBytes(UTF_8)));
+    }
+  }
+
+  @Nested
+  class Typed_clients {
+
+    final Codec<String> strings =
+        new Codec<>() {
+          @Override
+          public byte[] encode(String value) {
+            return value.getBytes(UTF_8);
+          }
+
+          @Override
+          public String decode(byte[] bytes) {
+            return new String(bytes, UTF_8);
+          }
+        };
+
+    private RetryableContinuumClient<String, String, String> retryable() {
+      return continuum.client(
+          "typed-tool",
+          String.class,
+          String.class,
+          String.class,
+          cfg ->
+              cfg.resultCodec(strings)
+                  .continuationCodec(strings)
+                  .dispatchCodec(strings)
+                  .deadline(Duration.ofMinutes(5))
+                  .backoff(Duration.ofSeconds(10)));
+    }
+
+    private ContinuumClient<String, String> oneShot() {
+      return continuum.client(
+          "typed-approval",
+          String.class,
+          String.class,
+          cfg ->
+              cfg.resultCodec(strings).continuationCodec(strings).deadline(Duration.ofMinutes(5)));
+    }
+
+    @Test
+    void create_complete_deliver_roundtrip_with_user_types() {
+      var client = retryable();
+      var computation = client.create("route-me", "dispatch-me");
+      client.complete(computation.id(), "the-answer");
+
+      var received = new CopyOnWriteArrayList<String>();
+      int delivered =
+          client.deliverResults(
+              10,
+              (continuation, outcome) -> {
+                assertThat(continuation).isEqualTo("route-me");
+                assertThat(outcome).isEqualTo(new TypedOutcome.Success<>("the-answer"));
+                received.add(continuation);
+              });
+      assertThat(delivered).isEqualTo(1);
+      assertThat(received).hasSize(1);
+      assertThat(client.deliverResults(10, (c, o) -> {})).isZero(); // acknowledged, gone
+    }
+
+    @Test
+    void failing_consumer_releases_the_delivery_for_redelivery_after_backoff() {
+      var client = retryable();
+      var computation = client.create("route-me", "dispatch-me");
+      client.complete(computation.id(), "the-answer");
+
+      assertThat(
+              client.deliverResults(
+                  10,
+                  (c, o) -> {
+                    throw new IllegalStateException("consumer crash");
+                  }))
+          .isZero();
+      assertThat(client.deliverResults(10, (c, o) -> {})).isZero(); // backing off
+      instants.advance(Duration.ofSeconds(11));
+      assertThat(client.deliverResults(10, (c, o) -> {})).isEqualTo(1);
+    }
+
+    @Test
+    void reap_consults_the_retry_and_extends_the_deadline() {
+      var client = retryable();
+      var computation = client.create("route-me", "dispatch-me");
+      instants.advance(Duration.ofMinutes(6));
+
+      var redispatched = new AtomicReference<String>();
+      int reaped =
+          client.reapExpiredComputations(
+              10,
+              Retry.of(
+                  r ->
+                      r.atMost(3)
+                          .handler(
+                              (dispatch, ctx) -> {
+                                assertThat(ctx.computationId()).isEqualTo(computation.id());
+                                assertThat(ctx.attemptCount()).isEqualTo(1);
+                                redispatched.set(dispatch);
+                              })));
+
+      assertThat(reaped).isEqualTo(1);
+      assertThat(redispatched.get()).isEqualTo("dispatch-me");
+      var found = continuum.find(computation.id()).orElseThrow();
+      assertThat(found.status()).isEqualTo(ComputationStatus.PENDING);
+      assertThat(found.attemptCount()).isEqualTo(2);
+      assertThat(found.deadline()).isEqualTo(instants.instant().plus(Duration.ofMinutes(5)));
+    }
+
+    @Test
+    void exhausted_retries_expire_the_computation_and_deliver_the_expiry() {
+      var client = retryable();
+      var computation = client.create("route-me", "dispatch-me");
+      var retry = Retry.<String>of(r -> r.atMost(1).handler((dispatch, ctx) -> {}));
+
+      instants.advance(Duration.ofMinutes(6));
+      assertThat(client.reapExpiredComputations(10, retry)).isEqualTo(1);
+
+      assertThat(continuum.find(computation.id()).orElseThrow().status())
+          .isEqualTo(ComputationStatus.EXPIRED);
+      var outcomes = new CopyOnWriteArrayList<TypedOutcome<String>>();
+      client.deliverResults(10, (continuation, outcome) -> outcomes.add(outcome));
+      assertThat(outcomes)
+          .containsExactly(
+              new TypedOutcome.Expired<>(
+                  ExpiryKind.RETRY_EXHAUSTED, "attempts exhausted (1 of 1)"));
+    }
+
+    @Test
+    void one_shot_reap_always_expires_with_retry_disallowed() {
+      var client = oneShot();
+      var computation = client.create("route-me");
+      instants.advance(Duration.ofMinutes(6));
+
+      assertThat(client.reapExpiredComputations(10)).isEqualTo(1);
+
+      var found = continuum.find(computation.id()).orElseThrow();
+      assertThat(found.status()).isEqualTo(ComputationStatus.EXPIRED);
+      assertThat(found.outcome())
+          .isEqualTo(
+              Outcome.expired(
+                  ExpiryKind.RETRY_DISALLOWED, "deadline " + found.deadline() + " passed"));
+    }
+
+    @Test
+    void purge_via_the_client_uses_call_site_ttl() {
+      var client = oneShot();
+      var computation = client.create("route-me");
+      client.complete(computation.id(), "done");
+      instants.advance(Duration.ofHours(2));
+
+      assertThat(client.purgeExpiredResults(100, Duration.ofHours(1))).isEqualTo(1);
+      assertThat(continuum.find(computation.id())).isEmpty();
     }
   }
 }
