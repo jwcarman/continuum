@@ -83,6 +83,12 @@
         <sonar.organization>jwcarman</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <sonar.projectKey>jwcarman_continuum</sonar.projectKey>
+        <!-- The TCK is test infrastructure shipped in src/main so providers can
+             extend it; it is exercised BY tests, not code needing its own coverage.
+             The aggregate report attributes cross-module TCK executions (which run
+             in continuum-memory/-jdbc test JVMs) back to the core classes they cover. -->
+        <sonar.coverage.exclusions>continuum-testing/**</sonar.coverage.exclusions>
+        <sonar.coverage.jacoco.xmlReportPaths>${maven.multiModuleProjectDirectory}/continuum-coverage/target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
         <!--
           ContinuumTck ships JUnit test classes in src/main so provider modules can
           extend them; its snake_case method and nested-class names are this
@@ -108,6 +114,7 @@
         <module>continuum-memory</module>
         <module>continuum-testing</module>
         <module>continuum-jdbc</module>
+        <module>continuum-coverage</module>
     </modules>
 
     <dependencyManagement>

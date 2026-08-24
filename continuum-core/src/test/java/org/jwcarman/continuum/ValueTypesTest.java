@@ -91,6 +91,84 @@ class ValueTypesTest {
   }
 
   @Nested
+  class Value_semantics {
+    private Computation computation(byte[] dispatchPayload, Outcome outcome) {
+      return new Computation(
+          new ComputationId(java.util.UUID.fromString("00000000-0000-0000-0000-000000000001")),
+          new ComputationKind("k"),
+          outcome == null ? ComputationStatus.PENDING : Outcome.statusOf(outcome),
+          Instant.EPOCH,
+          Instant.EPOCH.plusSeconds(60),
+          dispatchPayload,
+          1,
+          outcome);
+    }
+
+    @Test
+    void computations_compare_dispatch_payloads_by_content() {
+      var a = computation(new byte[] {1, 2}, null);
+      var b = computation(new byte[] {1, 2}, null);
+      assertThat(a).isEqualTo(b).hasSameHashCodeAs(b);
+      assertThat(a).isNotEqualTo(computation(new byte[] {9}, null));
+      assertThat(a.toString()).contains("PENDING");
+    }
+
+    @Test
+    void computations_with_different_outcomes_differ() {
+      assertThat(computation(null, Outcome.failure("f")))
+          .isNotEqualTo(computation(null, Outcome.success(new byte[] {1})));
+    }
+
+    @Test
+    void requests_compare_payloads_by_content() {
+      var a =
+          new ComputationRequest(
+              new ComputationKind("k"), new byte[] {1}, Instant.EPOCH, new byte[] {2});
+      var b =
+          new ComputationRequest(
+              new ComputationKind("k"), new byte[] {1}, Instant.EPOCH, new byte[] {2});
+      assertThat(a).isEqualTo(b).hasSameHashCodeAs(b);
+      assertThat(a)
+          .isNotEqualTo(
+              new ComputationRequest(
+                  new ComputationKind("k"), new byte[] {1}, Instant.EPOCH, null));
+      assertThat(a.toString()).contains("retryable=true");
+    }
+
+    @Test
+    void deliveries_compare_payloads_by_content() {
+      var computationId = ComputationId.random();
+      var continuationId = ContinuationId.random();
+      var a =
+          new CompletionDelivery(
+              computationId,
+              new ComputationKind("k"),
+              continuationId,
+              new byte[] {1},
+              Outcome.failure("f"));
+      var b =
+          new CompletionDelivery(
+              computationId,
+              new ComputationKind("k"),
+              continuationId,
+              new byte[] {1},
+              Outcome.failure("f"));
+      assertThat(a).isEqualTo(b).hasSameHashCodeAs(b);
+      assertThat(a.toString()).contains(computationId.value().toString());
+    }
+
+    @Test
+    void outcome_arms_have_value_semantics() {
+      assertThat(Outcome.failure("f")).isEqualTo(Outcome.failure("f"));
+      assertThat(Outcome.expired(ExpiryKind.RETRY_EXHAUSTED, "m"))
+          .isEqualTo(Outcome.expired(ExpiryKind.RETRY_EXHAUSTED, "m"))
+          .isNotEqualTo(Outcome.expired(ExpiryKind.RETRY_DISALLOWED, "m"));
+      assertThat(Outcome.success(new byte[] {1})).isNotEqualTo(Outcome.success(new byte[] {2}));
+      assertThat(Outcome.success(new byte[] {1}).toString()).contains("1 bytes");
+    }
+  }
+
+  @Nested
   class Computations {
     @Test
     void retryable_means_dispatch_payload_present() {

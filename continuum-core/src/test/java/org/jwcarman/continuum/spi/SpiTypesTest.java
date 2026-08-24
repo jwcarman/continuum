@@ -32,6 +32,14 @@ class SpiTypesTest {
   }
 
   @Test
+  void persistence_exception_carries_message_and_cause() {
+    var cause = new IllegalStateException("root");
+    var wrapped = new ContinuumPersistenceException("failed", cause);
+    assertThat(wrapped).hasMessage("failed").hasCause(cause);
+    assertThat(new ContinuumPersistenceException("bare")).hasMessage("bare").hasNoCause();
+  }
+
+  @Test
   void stored_continuation_requires_payload() {
     assertThatNullPointerException()
         .isThrownBy(() -> new StoredContinuation(ContinuationId.random(), null));
