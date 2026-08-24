@@ -23,6 +23,8 @@ import org.jwcarman.codec.spi.CodecFactory;
 
 final class DefaultRetryableClientConfig<R, C, D> implements RetryableClientConfig<R, C, D> {
 
+  private static final String CODEC_NULL_MESSAGE = "codec must not be null";
+
   private CodecFactory codecFactory;
   private Codec<R> resultCodec;
   private Codec<C> continuationCodec;
@@ -40,19 +42,19 @@ final class DefaultRetryableClientConfig<R, C, D> implements RetryableClientConf
 
   @Override
   public RetryableClientConfig<R, C, D> resultCodec(Codec<R> codec) {
-    this.resultCodec = Objects.requireNonNull(codec, "codec must not be null");
+    this.resultCodec = Objects.requireNonNull(codec, CODEC_NULL_MESSAGE);
     return this;
   }
 
   @Override
   public RetryableClientConfig<R, C, D> continuationCodec(Codec<C> codec) {
-    this.continuationCodec = Objects.requireNonNull(codec, "codec must not be null");
+    this.continuationCodec = Objects.requireNonNull(codec, CODEC_NULL_MESSAGE);
     return this;
   }
 
   @Override
   public RetryableClientConfig<R, C, D> dispatchCodec(Codec<D> codec) {
-    this.dispatchCodec = Objects.requireNonNull(codec, "codec must not be null");
+    this.dispatchCodec = Objects.requireNonNull(codec, CODEC_NULL_MESSAGE);
     return this;
   }
 
@@ -100,10 +102,7 @@ final class DefaultRetryableClientConfig<R, C, D> implements RetryableClientConf
         kind,
         resolve(resultCodec, resultType, "result"),
         resolve(continuationCodec, continuationType, "continuation"),
-        deadline,
-        lease,
-        backoff,
-        workerId);
+        new ClientSupport.ClientSettings(deadline, lease, backoff, workerId));
   }
 
   Codec<D> resolveDispatchCodec(Class<D> dispatchType) {

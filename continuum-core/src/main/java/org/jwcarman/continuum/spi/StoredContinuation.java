@@ -15,6 +15,7 @@
  */
 package org.jwcarman.continuum.spi;
 
+import java.util.Arrays;
 import java.util.Objects;
 import org.jwcarman.continuum.ContinuationId;
 
@@ -23,5 +24,22 @@ public record StoredContinuation(ContinuationId id, byte[] payload) {
   public StoredContinuation {
     Objects.requireNonNull(id, "id must not be null");
     Objects.requireNonNull(payload, "payload must not be null");
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    return o instanceof StoredContinuation other
+        && id.equals(other.id)
+        && Arrays.equals(payload, other.payload);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(id, Arrays.hashCode(payload));
+  }
+
+  @Override
+  public String toString() {
+    return "StoredContinuation[id=%s, %d bytes]".formatted(id.value(), payload.length);
   }
 }

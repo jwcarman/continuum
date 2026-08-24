@@ -20,7 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -102,8 +101,9 @@ class DefaultContinuumTest {
       when(repository.registerContinuation(any(), any()))
           .thenReturn(new RegistrationOutcome.NotFound());
       var id = ComputationId.random();
+      byte[] payload = "x".getBytes(UTF_8);
       assertThatExceptionOfType(ComputationNotFoundException.class)
-          .isThrownBy(() -> continuum.registerContinuation(id, "x".getBytes(UTF_8)));
+          .isThrownBy(() -> continuum.registerContinuation(id, payload));
     }
   }
 
@@ -120,8 +120,7 @@ class DefaultContinuumTest {
     void maps_repository_outcomes() {
       var id = ComputationId.random();
       var outcome = Outcome.success("r".getBytes(UTF_8));
-      when(repository.complete(eq(id), eq(outcome), eq(NOW)))
-          .thenReturn(CompletionOutcome.ALREADY_RESOLVED);
+      when(repository.complete(id, outcome, NOW)).thenReturn(CompletionOutcome.ALREADY_RESOLVED);
       assertThat(continuum.complete(id, outcome)).isEqualTo(CompletionResult.ALREADY_RESOLVED);
     }
   }

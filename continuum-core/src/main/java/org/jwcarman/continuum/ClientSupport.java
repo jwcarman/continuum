@@ -28,34 +28,27 @@ import org.slf4j.LoggerFactory;
 
 final class ClientSupport<R, C> {
 
+  record ClientSettings(Duration deadline, Duration lease, Duration backoff, String workerId) {}
+
   private static final Logger log = LoggerFactory.getLogger(ClientSupport.class);
 
   private final Continuum continuum;
   private final ComputationKind kind;
   private final Codec<R> resultCodec;
   private final Codec<C> continuationCodec;
-  private final Duration deadline;
-  private final Duration lease;
-  private final Duration backoff;
-  private final String workerId;
+  private final ClientSettings settings;
 
   ClientSupport(
       Continuum continuum,
       ComputationKind kind,
       Codec<R> resultCodec,
       Codec<C> continuationCodec,
-      Duration deadline,
-      Duration lease,
-      Duration backoff,
-      String workerId) {
+      ClientSettings settings) {
     this.continuum = continuum;
     this.kind = kind;
     this.resultCodec = resultCodec;
     this.continuationCodec = continuationCodec;
-    this.deadline = deadline;
-    this.lease = lease;
-    this.backoff = backoff;
-    this.workerId = workerId;
+    this.settings = settings;
   }
 
   ComputationKind kind() {
@@ -67,7 +60,7 @@ final class ClientSupport<R, C> {
   }
 
   Duration deadline() {
-    return deadline;
+    return settings.deadline();
   }
 
   Instant now() {
@@ -76,7 +69,7 @@ final class ClientSupport<R, C> {
 
   Computation create(C continuation, byte[] dispatchPayload, Duration deadlineOverride) {
     Objects.requireNonNull(continuation, "continuation must not be null");
-    Duration effective = deadlineOverride != null ? deadlineOverride : deadline;
+    Duration effective = deadlineOverride != null ? deadlineOverride : settings.deadline();
     return continuum.create(
         new ComputationRequest(
             kind, continuationCodec.encode(continuation), now().plus(effective), dispatchPayload));
@@ -115,7 +108,7 @@ final class ClientSupport<R, C> {
     Objects.requireNonNull(consumer, "consumer must not be null");
     ContinuumRepository repository = continuum.repository();
     List<ClaimedDelivery> claimed =
-        repository.claimDeliveries(workerId, kind, batchSize, lease, now());
+        repository.claimDeliveries(settings.workerId(), kind, batchSize, settings.lease(), now());
     int delivered = 0;
     for (ClaimedDelivery delivery : claimed) {
       try {
@@ -126,7 +119,7 @@ final class ClientSupport<R, C> {
         delivered++;
       } catch (RuntimeException e) {
         log.warn("delivery {} failed; releasing for retry", delivery.id().value(), e);
-        repository.releaseDelivery(delivery.id(), now().plus(backoff));
+        repository.releaseDelivery(delivery.id(), now().plus(settings.backoff()));
       }
     }
     return delivered;

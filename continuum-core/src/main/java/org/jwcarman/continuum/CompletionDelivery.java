@@ -15,6 +15,7 @@
  */
 package org.jwcarman.continuum;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 public record CompletionDelivery(
@@ -30,5 +31,27 @@ public record CompletionDelivery(
     Objects.requireNonNull(continuationId, "continuationId must not be null");
     Objects.requireNonNull(continuationPayload, "continuationPayload must not be null");
     Objects.requireNonNull(outcome, "outcome must not be null");
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    return o instanceof CompletionDelivery other
+        && computationId.equals(other.computationId)
+        && kind.equals(other.kind)
+        && continuationId.equals(other.continuationId)
+        && Arrays.equals(continuationPayload, other.continuationPayload)
+        && outcome.equals(other.outcome);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        computationId, kind, continuationId, Arrays.hashCode(continuationPayload), outcome);
+  }
+
+  @Override
+  public String toString() {
+    return "CompletionDelivery[computationId=%s, kind=%s, continuationId=%s, outcome=%s]"
+        .formatted(computationId.value(), kind.value(), continuationId.value(), outcome);
   }
 }
