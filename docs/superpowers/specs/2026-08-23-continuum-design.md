@@ -329,8 +329,10 @@ retry state Continuum persists** (on the computation record, bumped atomically
 with the deadline extension). Attempt limits and backoff are policy computed
 inside the handler from durable inputs — e.g.
 `attemptCount >= 3 ? Abandon : Redispatched(now + timeout)`, with any backoff
-curve expressed through the returned `newDeadline`. Per-computation budgets can
-ride in `metadata`. Note that timeout-paced retries are self-throttling: attempt
+curve expressed through the returned `newDeadline`. (`metadata` is opaque
+diagnostic tagging — trace ids, labels — stored and handed back, never
+interpreted; retry policy belongs in `Retry` config, not in metadata.)
+Note that timeout-paced retries are self-throttling: attempt
 N+1 cannot occur until attempt N's full timeout has elapsed, so no separate
 backoff mechanism is built in.
 
