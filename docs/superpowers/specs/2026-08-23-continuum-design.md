@@ -16,7 +16,7 @@ Maven multi-module build, groupId `org.jwcarman.continuum`, initial version
 ```
 continuum-parent          (pom root)
 ├── continuum-bom         (dependency BOM for consumers)
-├── continuum-core        (API + SPI + pump components; deps: slf4j-api only)
+├── continuum-core        (API + SPI + pumps + typed kind clients; deps: slf4j-api, codec-core)
 ├── continuum-memory      (in-memory ContinuumRepository, for tests/embedded use)
 ├── continuum-jdbc        (PostgreSQL implementation, plain JDBC via DataSource)
 └── continuum-testing     (TCK: reusable abstract test suite both providers run against)
@@ -82,15 +82,14 @@ Decisions the specification left open:
 3. **Time** — an injected `java.time.InstantSource` (every `Clock` is an
    `InstantSource`; Continuum never needs a `ZoneId`). Tests use fixed/steppable
    sources.
-4. **Payloads are opaque `byte[]`** end to end — the outcome payload, the
-   continuation payload, and the dispatch payload alike. The caller owns the
-   serialization strategy; core holds no codec, no serializer SPI, and no type
-   parameters. Generics are deliberately rejected on `Continuum` itself: one
-   instance coordinates many kinds with different result/continuation/dispatch
-   types, and the delivery pump drains a mixed-kind outbox, so no single type
-   assignment is honest. A typed per-kind facade (e.g. a `continuum-codec`
-   module over `org.jwcarman.codec`) is an explicit fast-follow candidate, built
-   entirely on the public API.
+4. **Storage and coordination are opaque `byte[]`** end to end — the outcome
+   payload, the continuation payload, and the dispatch payload alike. The
+   `Continuum` interface, SPI, persistence, and pumps never see a codec.
+   Generics are deliberately rejected on `Continuum` itself: one instance
+   coordinates many kinds with different result/continuation/dispatch types,
+   and the delivery pump drains a mixed-kind outbox, so no single type
+   assignment is honest. Strong typing is provided by the kind-scoped client
+   layer (section 2a), where generics bind per kind.
 5. **Dispatch payload (retry breadcrumb)** — `ComputationRequest` accepts an
    optional opaque `byte[] dispatchPayload` meaning "how to (re)dispatch this
    work," mirroring the continuation payload's "what to do with the result." It
@@ -99,6 +98,33 @@ Decisions the specification left open:
    to the `RetryHandler` via `ExpiredComputation`. Apps with their own durable
    dispatch state may leave it null and use `invocationId` as a foreign key.
    It is a write-once breadcrumb, not mutable workflow state (non-goal §3).
+
+## 2a. Typed kind-scoped client layer (`continuum-core`)
+
+Callers work with user-defined types; serialization is pluggable via
+`org.jwcarman.codec` (`codec-core`: `Codec<T>` / `CodecFactory` / `TypeRef` —
+three files, zero transitive dependencies, so `continuum-core` depends on it
+directly alongside slf4j-api).
+
+- `KindClient<R, C, D>` — a typed facade bound to one `ComputationKind` plus a
+  `CodecFactory` and the result/continuation/dispatch types. Built entirely on
+  the public byte[] API: `create(...)` encodes the continuation and dispatch
+  payloads; `complete(id, R)` encodes the result; registration decodes a
+  `Resolved` outcome.
+- `DeliveryRouter` — the pump cannot be generic (it drains a mixed-kind
+  outbox), so a router dispatches each `CompletionDelivery` by kind to a
+  kind-bound typed handler that decodes the continuation payload and outcome
+  before application code sees them. Unrouted kinds go to an explicit
+  fallback: either a registered raw byte[] handler or fail-and-release (the
+  delivery backs off rather than vanishing). The same routing pattern applies
+  to typed per-kind `RetryHandler`s, with `dispatchPayload` decoded to `D`.
+- Concrete formats come from the codec project's backends: `codec-jackson`
+  (Jackson 3), `codec-gson`, `codec-protobuf`. A Jackson 2 backend
+  (`codec-jackson2`) is a follow-up in the codec repo — Continuum deliberately
+  ships no serialization-format modules of its own; its module list stays
+  about persistence providers.
+- The raw byte[] API remains public and documented — it is what the typed
+  layer is built on, and an escape hatch for polyglot payloads.
 
 ## 3. Pump components (no threads)
 
