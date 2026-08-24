@@ -59,7 +59,8 @@ continuum_computation   (pending only — presence means pending)
 continuum_continuation  (id, computation_id, payload, created_at)
 
 continuum_result        (computation_id, kind, outcome_type, outcome_payload,
-                         detail_kind, message, created_at, completed_at)
+                         detail_kind, message, deadline_at, attempt_count,
+                         created_at, completed_at)
 
 continuum_outbox        (id, computation_id, continuation_id, kind,
                          continuation_payload, outcome_type, outcome_payload,
