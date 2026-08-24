@@ -55,10 +55,11 @@ The public API follows the specification's suggested types verbatim:
   `INFRASTRUCTURE_FAILURE`.
 - `RetrySemantics` — `RETRYABLE`, `NON_RETRYABLE`.
 - `Computation` — id, kind, status, createdAt, deadline, outcome (absent while
-  pending), plus retrySemantics, invocationId, dispatchPayload, metadata,
-  attemptCount.
+  pending), plus retrySemantics, invocationId, dispatchPayload, attemptCount.
 - `ComputationRequest(kind, continuationPayload, deadline, retrySemantics,
-  invocationId, dispatchPayload, metadata)`.
+  invocationId, dispatchPayload)`. (The specification's §32 sketch included a
+  `metadata` map; v1 deliberately omits it — it had no consumer, and the
+  continuation/dispatch payloads already carry any application data.)
 - `RegistrationResult` — sealed: `Registered(ContinuationId)` | `Resolved(Outcome)`.
 - `CompletionResult` — `COMPLETED`, `ALREADY_RESOLVED`, `NOT_FOUND`.
 - `CompletionDelivery(computationId, kind, continuationId, continuationPayload,
@@ -192,7 +193,7 @@ router, p -> p.batchSize(...).lease(...).workerId(...))`, and
   `RetriedDefault` → `Redispatched(now + client's configured deadline)`;
   `NotRetried` → `Abandon` → `TIMEOUT_RETRY_EXHAUSTED`. `RetryContext`
   carries `computationId` (the redispatched worker needs it to `complete()`),
-  `invocationId`, `attemptCount`, metadata, the expired deadline, and kind;
+  `invocationId`, `attemptCount`, the expired deadline, and kind;
   `D` is the decoded dispatch payload — the payload is the application's
   vocabulary, the context is Continuum's durable facts.
 
@@ -303,7 +304,7 @@ public interface RetryHandler {
 
 `ExpiredComputation` carries the `computationId` (the redispatched worker must
 know where to `complete()` to), kind, `attemptCount`, `invocationId`,
-`dispatchPayload`, `metadata`, and the expired deadline — everything needed to
+`dispatchPayload`, and the expired deadline — everything needed to
 decide and to re-dispatch, so the handler is stateless and any JVM's reaper can
 run it against a computation created by a long-dead process.
 
@@ -329,9 +330,7 @@ retry state Continuum persists** (on the computation record, bumped atomically
 with the deadline extension). Attempt limits and backoff are policy computed
 inside the handler from durable inputs — e.g.
 `attemptCount >= 3 ? Abandon : Redispatched(now + timeout)`, with any backoff
-curve expressed through the returned `newDeadline`. (`metadata` is opaque
-diagnostic tagging — trace ids, labels — stored and handed back, never
-interpreted; retry policy belongs in `Retry` config, not in metadata.)
+curve expressed through the returned `newDeadline`.
 Note that timeout-paced retries are self-throttling: attempt
 N+1 cannot occur until attempt N's full timeout has elapsed, so no separate
 backoff mechanism is built in.
@@ -383,7 +382,7 @@ PostgreSQL over plain JDBC (`javax.sql.DataSource`; no Spring):
   resource (`continuum-postgresql.sql`). No migration tooling; applications own
   schema management. The computation table extends the specification's sketch
   with the retry columns: `retry_semantics`, `invocation_id`,
-  `dispatch_payload`, `attempt_count`, and `metadata`.
+  `dispatch_payload`, and `attempt_count`.
 - The provider manages its own transactions (`autoCommit=false`,
   commit/rollback per SPI operation).
 - Completion and registration lock the computation row with
