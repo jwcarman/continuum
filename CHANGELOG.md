@@ -23,6 +23,8 @@ All notable changes to this project will be documented in this file.
   atomic ownership-transfer completion).
 - `continuum-testing`: TCK exercising the full concurrency battery, run by
   both providers.
+- Value-typed pump parameters (`BatchSize`, `Lease`, `Backoff`, `ResultTtl`)
+  with validated construction and unit factories.
 - `continuum-bom`.
 - `continuum-spring-boot-starter` + `continuum-autoconfigure`: auto-configures
   `JdbcContinuumRepository` (when `continuum-jdbc` and a `DataSource` are

@@ -14,13 +14,11 @@ channel to subscribe to, miss, or handle inconsistently.
 
 ```java
 toolCalls.deliverResults(BatchSize.of(25), (continuation, outcome) -> switch (outcome) {
-    case Success<ToolCallResult>(var result) -> backlog.recordResult(continuation, result);
-    case Failure<ToolCallResult>(var message) -> backlog.recordFailure(continuation, message);
-    case Expired<ToolCallResult>(var kind, var message) -> backlog.recordTimeout(continuation, kind);
+    case TypedOutcome.Success<ToolCallResult>(var result) -> backlog.recordResult(continuation, result);
+    case TypedOutcome.Failure<ToolCallResult>(var message) -> backlog.recordFailure(continuation, message);
+    case TypedOutcome.Expired<ToolCallResult>(var kind, var message) -> backlog.recordTimeout(continuation, kind);
 });
 ```
-
-(Arms shown unqualified for brevity — they are `TypedOutcome.Success` etc.)
 
 ## Competing consumers and leases
 
