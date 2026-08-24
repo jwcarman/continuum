@@ -173,8 +173,10 @@ dependencies, so `continuum-core` depends on it directly alongside slf4j-api).
   client's config in hand: `Retried(timeout)` → `Redispatched(now + timeout)`;
   `RetriedDefault` → `Redispatched(now + client's configured deadline)`;
   `NotRetried` → `Abandon` → `TIMEOUT_RETRY_EXHAUSTED`. `RetryContext`
-  carries `attemptCount`, `invocationId`, kind, metadata, and the expired
-  deadline; `D` is the decoded dispatch payload. Declarative policies are
+  carries `computationId` (the redispatched worker needs it to `complete()`),
+  `invocationId`, `attemptCount`, metadata, the expired deadline, and kind;
+  `D` is the decoded dispatch payload — the payload is the application's
+  vocabulary, the context is Continuum's durable facts. Declarative policies are
   combinators over this functional core — `Retry.atMost(n, inner)` returns
   `NotRetried("attempts exhausted")` once `ctx.attemptCount() >= n` without
   invoking the inner retry. A client configured with **no** `Retry` creates
@@ -247,7 +249,8 @@ public interface RetryHandler {
 }
 ```
 
-`ExpiredComputation` carries kind, `attemptCount`, `invocationId`,
+`ExpiredComputation` carries the `computationId` (the redispatched worker must
+know where to `complete()` to), kind, `attemptCount`, `invocationId`,
 `dispatchPayload`, `metadata`, and the expired deadline — everything needed to
 decide and to re-dispatch, so the handler is stateless and any JVM's reaper can
 run it against a computation created by a long-dead process.
