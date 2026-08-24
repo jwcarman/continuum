@@ -29,8 +29,8 @@ import org.slf4j.LoggerFactory;
 
 final class ClientSupport<R, C> {
 
-  static final Duration DEFAULT_LEASE = Duration.ofSeconds(30);
-  static final Duration DEFAULT_BACKOFF = Duration.ofSeconds(30);
+  static final Lease DEFAULT_LEASE = Lease.ofSeconds(30);
+  static final Backoff DEFAULT_BACKOFF = Backoff.ofSeconds(30);
 
   private static final Logger log = LoggerFactory.getLogger(ClientSupport.class);
 
@@ -110,13 +110,14 @@ final class ClientSupport<R, C> {
   }
 
   int deliverResults(
-      int batchSize, Duration lease, Duration backoff, BiConsumer<C, TypedOutcome<R>> consumer) {
+      BatchSize batchSize, Lease lease, Backoff backoff, BiConsumer<C, TypedOutcome<R>> consumer) {
+    Objects.requireNonNull(batchSize, "batchSize must not be null");
     Objects.requireNonNull(lease, "lease must not be null");
     Objects.requireNonNull(backoff, "backoff must not be null");
     Objects.requireNonNull(consumer, "consumer must not be null");
     ContinuumRepository repository = continuum.repository();
     List<ClaimedDelivery> claimed =
-        repository.claimDeliveries(workerId, kind, batchSize, lease, now());
+        repository.claimDeliveries(workerId, kind, batchSize.value(), lease.value(), now());
     int delivered = 0;
     for (ClaimedDelivery delivery : claimed) {
       try {
@@ -127,22 +128,24 @@ final class ClientSupport<R, C> {
         delivered++;
       } catch (RuntimeException e) {
         log.warn("delivery {} failed; releasing for retry", delivery.id().value(), e);
-        repository.releaseDelivery(delivery.id(), now().plus(backoff));
+        repository.releaseDelivery(delivery.id(), now().plus(backoff.value()));
       }
     }
     return delivered;
   }
 
-  int purgeExpiredResults(int batchSize, Duration ttl) {
+  int purgeExpiredResults(BatchSize batchSize, ResultTtl ttl) {
+    Objects.requireNonNull(batchSize, "batchSize must not be null");
     Objects.requireNonNull(ttl, "ttl must not be null");
-    return continuum.repository().purgeResults(kind, now().minus(ttl), batchSize);
+    return continuum.repository().purgeResults(kind, now().minus(ttl.value()), batchSize.value());
   }
 
   void failExpired(Computation computation, ExpiryKind expiryKind, String message) {
     continuum.repository().complete(computation.id(), Outcome.expired(expiryKind, message), now());
   }
 
-  List<Computation> findExpired(int batchSize) {
-    return continuum.repository().findExpired(kind, now(), batchSize);
+  List<Computation> findExpired(BatchSize batchSize) {
+    Objects.requireNonNull(batchSize, "batchSize must not be null");
+    return continuum.repository().findExpired(kind, now(), batchSize.value());
   }
 }

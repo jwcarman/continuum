@@ -56,17 +56,17 @@ public final class RetryableContinuumClient<R, C, D> {
     return support.register(id, continuation);
   }
 
-  public int deliverResults(int batchSize, BiConsumer<C, TypedOutcome<R>> consumer) {
+  public int deliverResults(BatchSize batchSize, BiConsumer<C, TypedOutcome<R>> consumer) {
     return support.deliverResults(
         batchSize, ClientSupport.DEFAULT_LEASE, ClientSupport.DEFAULT_BACKOFF, consumer);
   }
 
   public int deliverResults(
-      int batchSize, Duration lease, Duration backoff, BiConsumer<C, TypedOutcome<R>> consumer) {
+      BatchSize batchSize, Lease lease, Backoff backoff, BiConsumer<C, TypedOutcome<R>> consumer) {
     return support.deliverResults(batchSize, lease, backoff, consumer);
   }
 
-  public int reapExpiredComputations(int batchSize, Retry<D> retry) {
+  public int reapExpiredComputations(BatchSize batchSize, Retry<D> retry) {
     Objects.requireNonNull(retry, "retry must not be null");
     int reaped = 0;
     for (Computation computation : support.findExpired(batchSize)) {
@@ -118,7 +118,7 @@ public final class RetryableContinuumClient<R, C, D> {
     return reaped;
   }
 
-  public int purgeExpiredResults(int batchSize, Duration ttl) {
+  public int purgeExpiredResults(BatchSize batchSize, ResultTtl ttl) {
     return support.purgeExpiredResults(batchSize, ttl);
   }
 

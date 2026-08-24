@@ -98,20 +98,20 @@ the client; schedule them however you like (fixed-delay recommended):
 
 ```java
 scheduler.scheduleWithFixedDelay(() ->
-    toolCalls.deliverResults(25, (continuation, outcome) -> switch (outcome) {
+    toolCalls.deliverResults(BatchSize.of(25), (continuation, outcome) -> switch (outcome) {
         case TypedOutcome.Success<ToolCallResult>(var result) -> backlog.recordResult(continuation, result);
         case TypedOutcome.Failure<ToolCallResult>(var message) -> backlog.recordFailure(continuation, message);
         case TypedOutcome.Expired<ToolCallResult>(var kind, var message) -> backlog.recordTimeout(continuation, kind);
     }), 0, 1, TimeUnit.SECONDS);
 
 scheduler.scheduleWithFixedDelay(() ->
-    toolCalls.reapExpiredComputations(12, Retry.of(r -> r
+    toolCalls.reapExpiredComputations(BatchSize.of(12), Retry.of(r -> r
         .atMost(3)
         .handler((descriptor, ctx) -> toolRuntime.dispatch(descriptor, ctx.computationId())))),
     5, 15, TimeUnit.SECONDS);
 
 scheduler.scheduleWithFixedDelay(() ->
-    toolCalls.purgeExpiredResults(200, Duration.ofHours(1)), 1, 10, TimeUnit.MINUTES);
+    toolCalls.purgeExpiredResults(BatchSize.of(200), ResultTtl.ofHours(1)), 1, 10, TimeUnit.MINUTES);
 ```
 
 Every instance of your application can run all pumps identically — no leader
@@ -125,7 +125,7 @@ no `Retry` and expires overdue computations as `RETRY_DISALLOWED`:
 ```java
 var approvals = continuum.client("approval", Decision.class, ApprovalContinuation.class,
     cfg -> cfg.codecs(codecs).deadline(Duration.ofDays(3)));
-approvals.reapExpiredComputations(10);
+approvals.reapExpiredComputations(BatchSize.of(10));
 ```
 
 ## Design highlights

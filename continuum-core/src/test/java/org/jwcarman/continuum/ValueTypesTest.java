@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -87,6 +88,29 @@ class ValueTypesTest {
       var request =
           new ComputationRequest(new ComputationKind("k"), new byte[] {1}, Instant.EPOCH, null);
       assertThat(request.dispatchPayload()).isNull();
+    }
+  }
+
+  @Nested
+  class Pump_parameters {
+    @Test
+    void batch_size_must_be_at_least_one() {
+      assertThatIllegalArgumentException().isThrownBy(() -> BatchSize.of(0));
+      assertThat(BatchSize.of(25).value()).isEqualTo(25);
+    }
+
+    @Test
+    void time_spans_must_be_positive() {
+      assertThatIllegalArgumentException().isThrownBy(() -> Lease.ofSeconds(0));
+      assertThatIllegalArgumentException().isThrownBy(() -> Backoff.of(Duration.ofSeconds(-1)));
+      assertThatNullPointerException().isThrownBy(() -> ResultTtl.of(null));
+    }
+
+    @Test
+    void unit_factories_agree_with_of() {
+      assertThat(Lease.ofSeconds(30)).isEqualTo(Lease.of(Duration.ofSeconds(30)));
+      assertThat(Backoff.ofMinutes(2)).isEqualTo(Backoff.of(Duration.ofMinutes(2)));
+      assertThat(ResultTtl.ofHours(1)).isEqualTo(ResultTtl.of(Duration.ofHours(1)));
     }
   }
 

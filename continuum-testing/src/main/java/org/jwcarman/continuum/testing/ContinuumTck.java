@@ -37,6 +37,8 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.continuum.Backoff;
+import org.jwcarman.continuum.BatchSize;
 import org.jwcarman.continuum.CompletionResult;
 import org.jwcarman.continuum.Computation;
 import org.jwcarman.continuum.ComputationId;
@@ -48,8 +50,10 @@ import org.jwcarman.continuum.Continuum;
 import org.jwcarman.continuum.ContinuumClient;
 import org.jwcarman.continuum.DefaultContinuum;
 import org.jwcarman.continuum.ExpiryKind;
+import org.jwcarman.continuum.Lease;
 import org.jwcarman.continuum.Outcome;
 import org.jwcarman.continuum.RegistrationResult;
+import org.jwcarman.continuum.ResultTtl;
 import org.jwcarman.continuum.Retry;
 import org.jwcarman.continuum.RetryableContinuumClient;
 import org.jwcarman.continuum.TypedOutcome;
@@ -451,7 +455,7 @@ public abstract class ContinuumTck {
       var received = new CopyOnWriteArrayList<String>();
       int delivered =
           client.deliverResults(
-              10,
+              BatchSize.of(10),
               (continuation, outcome) -> {
                 assertThat(continuation).isEqualTo("route-me");
                 assertThat(outcome).isEqualTo(new TypedOutcome.Success<>("the-answer"));
@@ -459,7 +463,8 @@ public abstract class ContinuumTck {
               });
       assertThat(delivered).isEqualTo(1);
       assertThat(received).hasSize(1);
-      assertThat(client.deliverResults(10, (c, o) -> {})).isZero(); // acknowledged, gone
+      assertThat(client.deliverResults(BatchSize.of(10), (c, o) -> {}))
+          .isZero(); // acknowledged, gone
     }
 
     @Test
@@ -470,16 +475,16 @@ public abstract class ContinuumTck {
 
       assertThat(
               client.deliverResults(
-                  10,
-                  Duration.ofSeconds(30),
-                  Duration.ofSeconds(10),
+                  BatchSize.of(10),
+                  Lease.ofSeconds(30),
+                  Backoff.ofSeconds(10),
                   (c, o) -> {
                     throw new IllegalStateException("consumer crash");
                   }))
           .isZero();
-      assertThat(client.deliverResults(10, (c, o) -> {})).isZero(); // backing off
+      assertThat(client.deliverResults(BatchSize.of(10), (c, o) -> {})).isZero(); // backing off
       instants.advance(Duration.ofSeconds(11));
-      assertThat(client.deliverResults(10, (c, o) -> {})).isEqualTo(1);
+      assertThat(client.deliverResults(BatchSize.of(10), (c, o) -> {})).isEqualTo(1);
     }
 
     @Test
@@ -491,7 +496,7 @@ public abstract class ContinuumTck {
       var redispatched = new AtomicReference<String>();
       int reaped =
           client.reapExpiredComputations(
-              10,
+              BatchSize.of(10),
               Retry.of(
                   r ->
                       r.atMost(3)
@@ -517,12 +522,12 @@ public abstract class ContinuumTck {
       var retry = Retry.<String>of(r -> r.atMost(1).handler((dispatch, ctx) -> {}));
 
       instants.advance(Duration.ofMinutes(6));
-      assertThat(client.reapExpiredComputations(10, retry)).isEqualTo(1);
+      assertThat(client.reapExpiredComputations(BatchSize.of(10), retry)).isEqualTo(1);
 
       assertThat(continuum.find(computation.id()).orElseThrow().status())
           .isEqualTo(ComputationStatus.EXPIRED);
       var outcomes = new CopyOnWriteArrayList<TypedOutcome<String>>();
-      client.deliverResults(10, (continuation, outcome) -> outcomes.add(outcome));
+      client.deliverResults(BatchSize.of(10), (continuation, outcome) -> outcomes.add(outcome));
       assertThat(outcomes)
           .containsExactly(
               new TypedOutcome.Expired<>(
@@ -535,7 +540,7 @@ public abstract class ContinuumTck {
       var computation = client.create("route-me");
       instants.advance(Duration.ofMinutes(6));
 
-      assertThat(client.reapExpiredComputations(10)).isEqualTo(1);
+      assertThat(client.reapExpiredComputations(BatchSize.of(10))).isEqualTo(1);
 
       var found = continuum.find(computation.id()).orElseThrow();
       assertThat(found.status()).isEqualTo(ComputationStatus.EXPIRED);
@@ -552,7 +557,7 @@ public abstract class ContinuumTck {
       client.complete(computation.id(), "done");
       instants.advance(Duration.ofHours(2));
 
-      assertThat(client.purgeExpiredResults(100, Duration.ofHours(1))).isEqualTo(1);
+      assertThat(client.purgeExpiredResults(BatchSize.of(100), ResultTtl.ofHours(1))).isEqualTo(1);
       assertThat(continuum.find(computation.id())).isEmpty();
     }
   }

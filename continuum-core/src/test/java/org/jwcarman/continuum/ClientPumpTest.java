@@ -91,7 +91,9 @@ class ClientPumpTest {
     @Test
     void call_site_lease_is_used_for_claims() {
       when(repository.claimDeliveries(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
-      retryable().deliverResults(7, Duration.ofSeconds(45), Duration.ofSeconds(20), (c, o) -> {});
+      retryable()
+          .deliverResults(
+              BatchSize.of(7), Lease.ofSeconds(45), Backoff.ofSeconds(20), (c, o) -> {});
       verify(repository)
           .claimDeliveries(any(), eq(KIND), eq(7), eq(Duration.ofSeconds(45)), eq(NOW));
     }
@@ -99,7 +101,7 @@ class ClientPumpTest {
     @Test
     void default_lease_is_used_when_not_supplied() {
       when(repository.claimDeliveries(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
-      retryable().deliverResults(7, (c, o) -> {});
+      retryable().deliverResults(BatchSize.of(7), (c, o) -> {});
       verify(repository)
           .claimDeliveries(any(), eq(KIND), eq(7), eq(Duration.ofSeconds(30)), eq(NOW));
     }
@@ -122,9 +124,9 @@ class ClientPumpTest {
       int delivered =
           retryable()
               .deliverResults(
-                  10,
-                  Duration.ofSeconds(30),
-                  Duration.ofSeconds(20),
+                  BatchSize.of(10),
+                  Lease.ofSeconds(30),
+                  Backoff.ofSeconds(20),
                   (c, o) -> {
                     throw new IllegalStateException("boom");
                   });
@@ -160,7 +162,7 @@ class ClientPumpTest {
           .thenReturn(List.of(failure, expired));
 
       var outcomes = new java.util.ArrayList<TypedOutcome<String>>();
-      int delivered = retryable().deliverResults(10, (c, o) -> outcomes.add(o));
+      int delivered = retryable().deliverResults(BatchSize.of(10), (c, o) -> outcomes.add(o));
 
       assertThat(delivered).isEqualTo(2);
       assertThat(outcomes)
@@ -179,7 +181,7 @@ class ClientPumpTest {
 
       Retry<String> retry =
           Retry.of(r -> r.timeout(Duration.ofSeconds(90)).handler((dispatch, ctx) -> {}));
-      assertThat(retryable().reapExpiredComputations(10, retry)).isEqualTo(1);
+      assertThat(retryable().reapExpiredComputations(BatchSize.of(10), retry)).isEqualTo(1);
 
       verify(repository).extendDeadline(computation.id(), NOW.plus(Duration.ofSeconds(90)), 2);
     }
@@ -190,7 +192,7 @@ class ClientPumpTest {
       when(repository.findExpired(KIND, NOW, 10)).thenReturn(List.of(computation));
 
       Retry<String> retry = Retry.of(r -> r.handler((dispatch, ctx) -> {}));
-      retryable().reapExpiredComputations(10, retry);
+      retryable().reapExpiredComputations(BatchSize.of(10), retry);
 
       verify(repository).extendDeadline(computation.id(), NOW.plus(Duration.ofMinutes(5)), 3);
     }
@@ -202,7 +204,7 @@ class ClientPumpTest {
 
       retryable()
           .reapExpiredComputations(
-              10, (dispatch, ctx) -> Retry.RetryResult.notRetried("circuit open"));
+              BatchSize.of(10), (dispatch, ctx) -> Retry.RetryResult.notRetried("circuit open"));
 
       verify(repository)
           .complete(
@@ -215,7 +217,7 @@ class ClientPumpTest {
       when(repository.findExpired(KIND, NOW, 10)).thenReturn(List.of(computation));
 
       Retry<String> retry = Retry.of(r -> r.handler((dispatch, ctx) -> {}));
-      assertThat(retryable().reapExpiredComputations(10, retry)).isEqualTo(1);
+      assertThat(retryable().reapExpiredComputations(BatchSize.of(10), retry)).isEqualTo(1);
 
       verify(repository)
           .complete(
@@ -233,7 +235,7 @@ class ClientPumpTest {
       int reaped =
           retryable()
               .reapExpiredComputations(
-                  10,
+                  BatchSize.of(10),
                   (dispatch, ctx) -> {
                     throw new IllegalStateException("dispatch transport down");
                   });
@@ -246,7 +248,7 @@ class ClientPumpTest {
     @Test
     void reap_requires_a_retry() {
       assertThatNullPointerException()
-          .isThrownBy(() -> retryable().reapExpiredComputations(10, null));
+          .isThrownBy(() -> retryable().reapExpiredComputations(BatchSize.of(10), null));
     }
   }
 
@@ -255,7 +257,8 @@ class ClientPumpTest {
     @Test
     void purge_translates_ttl_to_an_absolute_cutoff() {
       when(repository.purgeResults(any(), any(), anyInt())).thenReturn(4);
-      assertThat(retryable().purgeExpiredResults(50, Duration.ofHours(2))).isEqualTo(4);
+      assertThat(retryable().purgeExpiredResults(BatchSize.of(50), ResultTtl.ofHours(2)))
+          .isEqualTo(4);
       verify(repository).purgeResults(KIND, NOW.minus(Duration.ofHours(2)), 50);
     }
   }
@@ -356,7 +359,7 @@ class ClientPumpTest {
                       .continuationCodec(ClientMintingTest.STRINGS)
                       .deadline(Duration.ofMinutes(5)));
 
-      assertThat(client.reapExpiredComputations(10)).isEqualTo(2);
+      assertThat(client.reapExpiredComputations(BatchSize.of(10))).isEqualTo(2);
       verify(repository)
           .complete(
               first.id(),
@@ -424,7 +427,7 @@ class ClientPumpTest {
       verify(continuum).complete(computation.id(), Outcome.success("done".getBytes(UTF_8)));
 
       when(repository.claimDeliveries(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
-      assertThat(client.deliverResults(5, (c, o) -> {})).isZero();
+      assertThat(client.deliverResults(BatchSize.of(5), (c, o) -> {})).isZero();
       assertThat(client.kind()).isEqualTo(KIND);
     }
 
