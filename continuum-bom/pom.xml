@@ -41,7 +41,7 @@
 
     <groupId>org.jwcarman.continuum</groupId>
     <artifactId>continuum-bom</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.3.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>Continuum BOM</name>
