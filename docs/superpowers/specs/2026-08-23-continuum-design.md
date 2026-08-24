@@ -268,8 +268,8 @@ likes, per kind:
 public final class ContinuumClient<R, C, D> {
     ...
     int deliverResults(int batchSize, BiConsumer<C, TypedOutcome<R>> consumer);
-    int retryExpiredComputations(int batchSize, Retry<D> retry);   // three-type only
-    int failExpiredComputations(int batchSize);                    // two-type only
+    int reapExpiredComputations(int batchSize, Retry<D> retry);    // three-type shape
+    int reapExpiredComputations(int batchSize);                    // two-type shape
     int purgeExpiredResults(int batchSize, Duration ttl);
 }
 ```
@@ -287,7 +287,7 @@ scheduler.scheduleWithFixedDelay(() ->
     }), 0, 1, TimeUnit.SECONDS);
 
 scheduler.scheduleWithFixedDelay(() ->
-    toolCalls.retryExpiredComputations(12, Retry.of(r -> r
+    toolCalls.reapExpiredComputations(12, Retry.of(r -> r
         .atMost(3)
         .handler((toolCall, ctx) -> toolRuntime.dispatch(toolCall, ctx.computationId())))),
     5, 15, TimeUnit.SECONDS);
@@ -307,8 +307,10 @@ Semantics:
   (spec §29: failures follow the same delivery path); a continuation is
   guaranteed exactly one eventual delivery *whatever* happened, so there is
   no separate timeout-notification channel to miss.
-- **`retryExpiredComputations`** — for each of this kind's pending
-  computations past deadline: invoke the supplied `Retry<D>` with the decoded
+- **`reapExpiredComputations`** — one activity, two shapes; a client has
+  exactly one of them, chosen by its type shape, so "which do I call" is
+  never a runtime decision. The three-type shape: for each of this kind's
+  pending computations past deadline, invoke the supplied `Retry<D>` with the decoded
   dispatch payload. `Retried`/`RetriedDefault` → extend deadline
   (`now + timeout` / `now + client deadline`), increment `attempt_count`
   atomically. `NotRetried(reason)` → terminalize as
@@ -317,9 +319,15 @@ Semantics:
   retries (bounded by pump cadence — no hot loop). Timeout-paced retries are
   self-throttling: attempt N+1 cannot occur until attempt N's full timeout
   elapses.
-- **`failExpiredComputations`** — the two-type counterpart: expired
-  computations terminalize as `Expired(RETRY_DISALLOWED, ...)`. No `Retry`
-  parameter — there is nothing to consult, enforced by the client shape.
+  The two-type shape: every expired computation unconditionally terminalizes
+  as `Expired(RETRY_DISALLOWED, "deadline ... passed")` — no `Retry`
+  parameter exists because there is nothing to consult, enforced by the
+  client shape. The `ExpiryKind` values map one-to-one onto the shapes:
+  `RETRY_DISALLOWED` is minted only by the two-type reap, `RETRY_EXHAUSTED`
+  only by the three-type reap, so consumers can trust the kind to say which
+  path the computation died on. (A payload-less row reached by the
+  three-type reap — possible only via raw-API use — also auto-fails as
+  `RETRY_DISALLOWED` rather than being skipped.)
 - **`purgeExpiredResults`** — deletes up to `batchSize` of this kind's result
   rows with `completed_at < now - ttl`. Policy-free storage; policy at the
   call site.
