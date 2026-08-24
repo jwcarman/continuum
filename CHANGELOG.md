@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-08-24
+
 ### Added
 
 - Core API: `Continuum`/`DefaultContinuum`, three-arm `Outcome`
@@ -31,3 +33,5 @@ All notable changes to this project will be documented in this file.
   present) or falls back to the in-memory repository with a warning, and wires
   a `Continuum` over it (honoring app-defined `ContinuumRepository` /
   `InstantSource` beans).
+
+[0.1.0]: https://github.com/jwcarman/continuum/releases/tag/0.1.0
