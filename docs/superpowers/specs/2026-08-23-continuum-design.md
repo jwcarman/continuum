@@ -115,8 +115,18 @@ Serialization is pluggable via `org.jwcarman.codec` (`codec-core`:
 `Codec<T>` / `CodecFactory` / `TypeRef` — three files, zero transitive
 dependencies, so `continuum-core` depends on it directly alongside slf4j-api).
 
+**Construction idiom (house style, as in Nessy):** every configurable
+component is built through a named `XxxCustomizer` functional interface —
+never a bare `Consumer` — whose lambda receives an `XxxConfig` with fluent
+setters and **no public `build()`**; the factory method creates the config,
+applies the customizer, and performs the build step itself. This applies to
+`Continuum.client(...)` (`ClientCustomizer` / `ClientConfig<R, C, D>`),
+`DeliveryRouter.of(r -> r.on(...).fallback(...))`, `DeliveryPump.of(repo,
+router, p -> p.batchSize(...).lease(...).workerId(...))`, and
+`TimeoutReaper.of(repo, handler, r -> ...)`.
+
 - `ContinuumClient<R, C, D>` — the typed handle bound to one
-  `ComputationKind`, minted from the `Continuum` instance via a configurer
+  `ComputationKind`, minted from the `Continuum` instance via the customizer
   DSL. `Continuum.client(...)` is a `default` method that builds the client
   purely from its arguments, so the interface itself stays the codec-free
   byte[] contract:
@@ -192,7 +202,7 @@ dependencies, so `continuum-core` depends on it directly alongside slf4j-api).
 - `DeliveryRouter` — the pump cannot be generic (it drains a mixed-kind
   outbox), so a router dispatches each `CompletionDelivery` by kind to a
   typed handler registered against a `ContinuumClient`
-  (`DeliveryRouter.builder().on(toolCalls, handler)`), which decodes the
+  (`DeliveryRouter.of(r -> r.on(toolCalls, handler))`), which decodes the
   continuation payload and outcome before application code sees them.
   Unrouted kinds go to an explicit fallback: either a registered raw byte[]
   handler or fail-and-release (the delivery backs off rather than vanishing).
