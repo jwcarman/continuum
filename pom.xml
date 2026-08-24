@@ -71,6 +71,7 @@
     <modules>
         <module>continuum-core</module>
         <module>continuum-memory</module>
+        <module>continuum-testing</module>
     </modules>
 
     <dependencyManagement>

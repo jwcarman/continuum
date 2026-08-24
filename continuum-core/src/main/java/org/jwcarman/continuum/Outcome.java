@@ -53,9 +53,9 @@ public sealed interface Outcome {
 
   static ComputationStatus statusOf(Outcome outcome) {
     return switch (outcome) {
-      case Success s -> ComputationStatus.COMPLETED;
-      case Failure f -> ComputationStatus.FAILED;
-      case Expired e -> ComputationStatus.EXPIRED;
+      case Success _ -> ComputationStatus.COMPLETED;
+      case Failure _ -> ComputationStatus.FAILED;
+      case Expired _ -> ComputationStatus.EXPIRED;
     };
   }
 }

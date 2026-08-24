@@ -43,10 +43,10 @@ public final class DefaultContinuum implements Continuum {
     ContinuationId continuationId = ContinuationId.random();
     return switch (repository.registerContinuation(
         id, new StoredContinuation(continuationId, continuationPayload))) {
-      case RegistrationOutcome.Registered r -> new RegistrationResult.Registered(continuationId);
+      case RegistrationOutcome.Registered _ -> new RegistrationResult.Registered(continuationId);
       case RegistrationOutcome.Resolved resolved ->
           new RegistrationResult.Resolved(resolved.outcome());
-      case RegistrationOutcome.NotFound n -> throw new ComputationNotFoundException(id);
+      case RegistrationOutcome.NotFound _ -> throw new ComputationNotFoundException(id);
     };
   }
 
