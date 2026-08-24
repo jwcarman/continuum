@@ -28,7 +28,15 @@ import org.springframework.context.annotation.Bean;
  * Configures durable PostgreSQL persistence when {@code continuum-jdbc} is on the classpath and the
  * application defines a {@link DataSource}.
  */
-@AutoConfiguration(before = ContinuumAutoConfiguration.class)
+@AutoConfiguration(
+    before = ContinuumAutoConfiguration.class,
+    // String names, not class references: DataSourceAutoConfiguration lives in an
+    // optional module. The first name covers Spring Boot 4.x (verified identical in
+    // 4.0 and 4.1); the second covers the Boot 3.x package. Unknown names are ignored.
+    afterName = {
+      "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
+      "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration"
+    })
 @ConditionalOnClass(JdbcContinuumRepository.class)
 @ConditionalOnBean(DataSource.class)
 public class JdbcContinuumAutoConfiguration {

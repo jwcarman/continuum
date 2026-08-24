@@ -31,6 +31,7 @@ import org.jwcarman.continuum.jdbc.JdbcContinuumRepository;
 import org.jwcarman.continuum.memory.InMemoryContinuumRepository;
 import org.jwcarman.continuum.spi.ContinuumRepository;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
 import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -111,6 +112,22 @@ class ContinuumAutoConfigurationTest {
                     .isInstanceOf(JdbcContinuumRepository.class);
                 assertThat(output).doesNotContain("in-memory");
               });
+    }
+
+    @Test
+    void a_boot_auto_configured_datasource_is_seen_by_the_jdbc_provider() {
+      // DataSourceAutoConfiguration must be ordered BEFORE our provider or its
+      // @ConditionalOnBean(DataSource.class) evaluates against a not-yet-registered bean.
+      new ApplicationContextRunner()
+          .withConfiguration(
+              AutoConfigurations.of(
+                  DataSourceAutoConfiguration.class,
+                  JdbcContinuumAutoConfiguration.class,
+                  ContinuumAutoConfiguration.class))
+          .run(
+              context ->
+                  assertThat(context.getBean(ContinuumRepository.class))
+                      .isInstanceOf(JdbcContinuumRepository.class));
     }
 
     @Test
