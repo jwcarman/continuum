@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **`deliverResults` now hands the consumer one `TypedDelivery` instead of two
+  loose values.** The old `(continuation, outcome)` shape could not see what the
+  pump already knew, which made the timestamps added in 0.1.0 unreachable from
+  the API almost everyone uses.
+
+  ```java
+  // before
+  client.deliverResults(BatchSize.of(25), (continuation, outcome) -> ...);
+
+  // after
+  client.deliverResults(BatchSize.of(25), delivery ->
+      ... delivery.continuation() ... delivery.outcome() ...);
+  ```
+
+  `TypedDelivery` adds `computationId`, `continuationId`, `submittedAt`,
+  `completedAt`, `elapsedTime()` and `deliveryAttempt()` — so a consumer can
+  correlate a log line, record end-to-end duration as the outcome arrives, and
+  implement a give-up or dead-letter policy without dropping to the raw SPI.
+
+  This replaces the two-argument overload rather than adding to it. Keeping both
+  made an *overloaded* method reference (`list::add`) ambiguous, and left two
+  ways to express one thing.
+
+- **`ClaimedDelivery.attemptCount` is now `deliveryAttempt`.** `attemptCount`
+  meant *dispatch* attempts on `Computation`/`ExpiryContext` and *delivery*
+  attempts here — one word, two meanings. `attemptCount` now has exactly one.
+
+
 ## [0.2.0] - 2026-08-24
 
 ### Fixed

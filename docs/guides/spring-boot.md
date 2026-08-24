@@ -65,8 +65,8 @@ lost, and one failure never aborts the rest of the batch. Returning normally is
 what acknowledges a delivery, and acknowledged deliveries are deleted.
 
 ```java
-toolCalls.deliverResults(BatchSize.of(25), (continuation, outcome) -> {
-    backlog.record(continuation, outcome);  // throwing here releases for retry
+toolCalls.deliverResults(BatchSize.of(25), delivery -> {
+    backlog.record(delivery.continuation(), delivery.outcome());  // throwing releases for retry
 });
 ```
 
@@ -75,11 +75,23 @@ did, the two cannot be atomic: a crash between them redelivers. This is why
 **consumers must be idempotent** — `ContinuationId` is the stable deduplication
 key. See [Delivery](../concepts/delivery.md).
 
-Note that nothing caps the retries. A delivery that always throws is retried
-forever, paced by the backoff. The typed consumer does not receive the attempt
-count, so enforcing a give-up policy means pumping through
-`continuum.repository().claimDeliveries(...)` directly, where `ClaimedDelivery`
-exposes `attemptCount`.
+Note that nothing caps the retries: a delivery that always throws is retried
+forever, paced by the backoff. Continuum will not give up on your behalf, but
+the delivery tells you how many attempts have been made, so you can:
+
+```java
+toolCalls.deliverResults(BatchSize.of(25), delivery -> {
+    if (delivery.deliveryAttempt() >= 10) {
+        deadLetter.record(delivery.continuationId(), delivery.outcome());
+        return;                                  // returning acknowledges: stop redelivering
+    }
+    backlog.record(delivery.continuation(), delivery.outcome());
+});
+```
+
+`deliveryAttempt()` counts *delivery* attempts, and is distinct from
+`Computation.attemptCount()`, which counts *dispatch* attempts — redelivering
+an outcome is not re-running the work.
 
 Joining a caller-managed transaction is a contemplated future direction, not a
 current capability. Design accordingly.

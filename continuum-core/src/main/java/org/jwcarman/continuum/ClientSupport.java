@@ -21,10 +21,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.StringJoiner;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.continuum.api.Backoff;
 import org.jwcarman.continuum.api.BatchSize;
+import org.jwcarman.continuum.api.CompletionDelivery;
 import org.jwcarman.continuum.api.CompletionResult;
 import org.jwcarman.continuum.api.Computation;
 import org.jwcarman.continuum.api.ComputationId;
@@ -35,6 +36,7 @@ import org.jwcarman.continuum.api.Lease;
 import org.jwcarman.continuum.api.Outcome;
 import org.jwcarman.continuum.api.RegistrationResult;
 import org.jwcarman.continuum.api.ResultTtl;
+import org.jwcarman.continuum.api.TypedDelivery;
 import org.jwcarman.continuum.api.TypedOutcome;
 import org.jwcarman.continuum.api.TypedRegistration;
 import org.jwcarman.continuum.spi.ClaimedDelivery;
@@ -150,7 +152,7 @@ final class ClientSupport<R, C> {
   }
 
   int deliverResults(
-      BatchSize batchSize, Lease lease, Backoff backoff, BiConsumer<C, TypedOutcome<R>> consumer) {
+      BatchSize batchSize, Lease lease, Backoff backoff, Consumer<TypedDelivery<C, R>> consumer) {
     Objects.requireNonNull(batchSize, BATCH_SIZE_NULL_MESSAGE);
     Objects.requireNonNull(lease, "lease must not be null");
     Objects.requireNonNull(backoff, "backoff must not be null");
@@ -159,19 +161,29 @@ final class ClientSupport<R, C> {
     List<ClaimedDelivery> claimed =
         repository.claimDeliveries(workerId, kind, batchSize.value(), lease.value(), now());
     int delivered = 0;
-    for (ClaimedDelivery delivery : claimed) {
+    for (ClaimedDelivery claim : claimed) {
       try {
-        consumer.accept(
-            continuationCodec.decode(delivery.delivery().continuationPayload()),
-            decode(delivery.delivery().outcome()));
-        repository.acknowledgeDelivery(delivery.id());
+        consumer.accept(decodeDelivery(claim));
+        repository.acknowledgeDelivery(claim.id());
         delivered++;
       } catch (RuntimeException e) {
-        log.warn("delivery {} failed; releasing for retry", delivery.id().value(), e);
-        repository.releaseDelivery(delivery.id(), now().plus(backoff.value()));
+        log.warn("delivery {} failed; releasing for retry", claim.id().value(), e);
+        repository.releaseDelivery(claim.id(), now().plus(backoff.value()));
       }
     }
     return delivered;
+  }
+
+  private TypedDelivery<C, R> decodeDelivery(ClaimedDelivery claim) {
+    CompletionDelivery delivery = claim.delivery();
+    return new TypedDelivery<>(
+        delivery.computationId(),
+        delivery.continuationId(),
+        continuationCodec.decode(delivery.continuationPayload()),
+        decode(delivery.outcome()),
+        delivery.submittedAt(),
+        delivery.completedAt(),
+        claim.deliveryAttempt());
   }
 
   int purgeExpiredResults(BatchSize batchSize, ResultTtl ttl) {

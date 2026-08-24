@@ -18,7 +18,7 @@ package org.jwcarman.continuum;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.continuum.api.Backoff;
 import org.jwcarman.continuum.api.BatchSize;
@@ -30,7 +30,7 @@ import org.jwcarman.continuum.api.ExpiryContext;
 import org.jwcarman.continuum.api.ExpiryKind;
 import org.jwcarman.continuum.api.Lease;
 import org.jwcarman.continuum.api.ResultTtl;
-import org.jwcarman.continuum.api.TypedOutcome;
+import org.jwcarman.continuum.api.TypedDelivery;
 import org.jwcarman.continuum.api.TypedRegistration;
 import org.jwcarman.continuum.retry.Retry;
 import org.jwcarman.continuum.retry.Retry.RetryResult;
@@ -122,30 +122,36 @@ public final class RetryableContinuumClient<R, C, D> {
   /**
    * Claims up to a batch of this kind's outbox deliveries under the default 30-second lease,
    * decodes each, and invokes the consumer. Success acknowledges (deletes) the delivery; a consumer
-   * exception releases it with the default 30-second backoff and an incremented attempt count — one
-   * delivery's failure never blocks the others. At-least-once: deduplicate on the continuation id.
+   * exception releases it with the default 30-second backoff and an incremented delivery attempt —
+   * one delivery's failure never blocks the others. At-least-once: deduplicate on {@link
+   * TypedDelivery#continuationId()}.
+   *
+   * <p>The consumer receives the whole {@link TypedDelivery}, not just the continuation and
+   * outcome: identities to correlate a log line against, {@link TypedDelivery#elapsedTime()} to
+   * record end-to-end duration as the outcome arrives, and {@link TypedDelivery#deliveryAttempt()}
+   * for a give-up or dead-letter policy.
    *
    * @param batchSize the maximum deliveries to process
-   * @param consumer receives the decoded continuation and typed outcome
+   * @param consumer receives the decoded delivery
    * @return the number successfully delivered — the drain signal
    */
-  public int deliverResults(BatchSize batchSize, BiConsumer<C, TypedOutcome<R>> consumer) {
+  public int deliverResults(BatchSize batchSize, Consumer<TypedDelivery<C, R>> consumer) {
     return support.deliverResults(
         batchSize, ClientSupport.DEFAULT_LEASE, ClientSupport.DEFAULT_BACKOFF, consumer);
   }
 
   /**
-   * As {@link #deliverResults(BatchSize, BiConsumer)} with an explicit lease (must exceed the
+   * As {@link #deliverResults(BatchSize, Consumer)} with an explicit lease (must exceed the
    * worst-case consumer time) and failure backoff.
    *
    * @param batchSize the maximum deliveries to process
    * @param lease how long claimed deliveries stay invisible to other claimers
    * @param backoff how long a failed delivery waits before redelivery
-   * @param consumer receives the decoded continuation and typed outcome
+   * @param consumer receives the decoded delivery
    * @return the number successfully delivered
    */
   public int deliverResults(
-      BatchSize batchSize, Lease lease, Backoff backoff, BiConsumer<C, TypedOutcome<R>> consumer) {
+      BatchSize batchSize, Lease lease, Backoff backoff, Consumer<TypedDelivery<C, R>> consumer) {
     return support.deliverResults(batchSize, lease, backoff, consumer);
   }
 

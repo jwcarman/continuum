@@ -114,8 +114,7 @@ class ClientPumpTest {
     void call_site_lease_is_used_for_claims() {
       when(repository.claimDeliveries(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
       retryable()
-          .deliverResults(
-              BatchSize.of(7), Lease.ofSeconds(45), Backoff.ofSeconds(20), (c, o) -> {});
+          .deliverResults(BatchSize.of(7), Lease.ofSeconds(45), Backoff.ofSeconds(20), d -> {});
       verify(repository)
           .claimDeliveries(any(), eq(KIND), eq(7), eq(Duration.ofSeconds(45)), eq(NOW));
     }
@@ -123,7 +122,7 @@ class ClientPumpTest {
     @Test
     void default_lease_is_used_when_not_supplied() {
       when(repository.claimDeliveries(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
-      retryable().deliverResults(BatchSize.of(7), (c, o) -> {});
+      retryable().deliverResults(BatchSize.of(7), d -> {});
       verify(repository)
           .claimDeliveries(any(), eq(KIND), eq(7), eq(Duration.ofSeconds(30)), eq(NOW));
     }
@@ -151,7 +150,7 @@ class ClientPumpTest {
                   BatchSize.of(10),
                   Lease.ofSeconds(30),
                   Backoff.ofSeconds(20),
-                  (c, o) -> {
+                  d -> {
                     throw new IllegalStateException("boom");
                   });
 
@@ -190,7 +189,7 @@ class ClientPumpTest {
           .thenReturn(List.of(failure, expired));
 
       var outcomes = new java.util.ArrayList<TypedOutcome<String>>();
-      int delivered = retryable().deliverResults(BatchSize.of(10), (c, o) -> outcomes.add(o));
+      int delivered = retryable().deliverResults(BatchSize.of(10), d -> outcomes.add(d.outcome()));
 
       assertThat(delivered).isEqualTo(2);
       assertThat(outcomes)
@@ -697,7 +696,7 @@ class ClientPumpTest {
       verify(continuum).complete(computation.id(), Outcome.success("done".getBytes(UTF_8)));
 
       when(repository.claimDeliveries(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
-      assertThat(client.deliverResults(BatchSize.of(5), (c, o) -> {})).isZero();
+      assertThat(client.deliverResults(BatchSize.of(5), d -> {})).isZero();
       assertThat(client.kind()).isEqualTo(KIND);
     }
 
@@ -717,7 +716,7 @@ class ClientPumpTest {
 
       assertThat(
               client.deliverResults(
-                  BatchSize.of(3), Lease.ofSeconds(45), Backoff.ofSeconds(5), (c, o) -> {}))
+                  BatchSize.of(3), Lease.ofSeconds(45), Backoff.ofSeconds(5), d -> {}))
           .isZero();
       verify(repository)
           .claimDeliveries(any(), eq(KIND), eq(3), eq(Duration.ofSeconds(45)), eq(NOW));

@@ -75,6 +75,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <gpg.plugin.version>3.2.8</gpg.plugin.version>
         <sonatype.plugin.version>0.10.0</sonatype.plugin.version>
+        <spotless.version>3.4.0</spotless.version>
         <sonar.plugin.version>5.5.0.6356</sonar.plugin.version>
         <!-- Nothing to analyse: this module is a dependencyManagement declaration. -->
         <sonar.skip>true</sonar.skip>
@@ -83,12 +84,25 @@
     <build>
         <plugins>
             <!--
-                CI runs `mvn verify sonar:sonar` across the reactor, and Maven resolves
-                the `sonar` prefix from each project's own build plugins. Having no
-                parent, this module inherits none, so the prefix fails here and takes
-                the whole build with it. Declared to keep the prefix resolvable;
-                sonar.skip above means it does no work.
+                Goals invoked by prefix (`mvn spotless:apply`, `mvn sonar:sonar`) are
+                resolved from each project's own build plugins, or from Maven's default
+                plugin groups — org.apache.maven.plugins and org.codehaus.mojo. Having no
+                parent, this module inherits nothing, so any plugin outside those default
+                groups fails to resolve here and takes the whole reactor build with it.
+
+                That is exactly these two and no others: `versions:` and `dependency:`
+                live in the default groups and resolve fine. Declared so the prefixes
+                work; neither does any work on a module that is nothing but a
+                dependencyManagement block, and sonar.skip above makes that explicit.
+
+                If a plugin with a third-party groupId is ever invoked by prefix across
+                the reactor, it needs adding here too.
             -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>${spotless.version}</version>
+            </plugin>
             <plugin>
                 <groupId>org.sonarsource.scanner.maven</groupId>
                 <artifactId>sonar-maven-plugin</artifactId>

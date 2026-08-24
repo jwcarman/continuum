@@ -113,10 +113,13 @@ the client; schedule them however you like (fixed-delay recommended):
 
 ```java
 scheduler.scheduleWithFixedDelay(() ->
-    toolCalls.deliverResults(BatchSize.of(25), (continuation, outcome) -> switch (outcome) {
-        case TypedOutcome.Success<ToolCallResult>(var result) -> backlog.recordResult(continuation, result);
-        case TypedOutcome.Failure<ToolCallResult>(var message) -> backlog.recordFailure(continuation, message);
-        case TypedOutcome.Expired<ToolCallResult>(var kind, var message) -> backlog.recordTimeout(continuation, kind);
+    toolCalls.deliverResults(BatchSize.of(25), delivery -> {
+        var continuation = delivery.continuation();
+        switch (delivery.outcome()) {
+            case TypedOutcome.Success<ToolCallResult>(var result) -> backlog.recordResult(continuation, result);
+            case TypedOutcome.Failure<ToolCallResult>(var message) -> backlog.recordFailure(continuation, message);
+            case TypedOutcome.Expired<ToolCallResult>(var kind, var message) -> backlog.recordTimeout(continuation, kind);
+        }
     }), 0, 1, TimeUnit.SECONDS);
 
 scheduler.scheduleWithFixedDelay(() ->

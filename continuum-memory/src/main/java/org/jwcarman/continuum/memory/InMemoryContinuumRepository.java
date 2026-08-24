@@ -63,7 +63,7 @@ public final class InMemoryContinuumRepository implements ContinuumRepository {
     private final CompletionDelivery delivery;
     private Instant availableAt;
     private Instant claimedUntil;
-    private int attemptCount;
+    private int deliveryAttempt;
 
     private OutboxItem(DeliveryId id, CompletionDelivery delivery, Instant availableAt) {
       this.id = id;
@@ -164,7 +164,7 @@ public final class InMemoryContinuumRepository implements ContinuumRepository {
           .forEach(
               item -> {
                 item.claimedUntil = now.plus(lease);
-                claimed.add(new ClaimedDelivery(item.id, item.delivery, item.attemptCount));
+                claimed.add(new ClaimedDelivery(item.id, item.delivery, item.deliveryAttempt));
               });
       return claimed;
     }
@@ -184,7 +184,7 @@ public final class InMemoryContinuumRepository implements ContinuumRepository {
       if (item != null) {
         item.claimedUntil = null;
         item.availableAt = retryAt;
-        item.attemptCount++;
+        item.deliveryAttempt++;
       }
     }
   }

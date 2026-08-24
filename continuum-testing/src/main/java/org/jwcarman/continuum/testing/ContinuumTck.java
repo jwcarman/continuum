@@ -408,7 +408,7 @@ public abstract class ContinuumTck {
       instants.advance(Duration.ofSeconds(11));
       var reclaimed = claimAll("wA");
       assertThat(reclaimed).hasSize(1);
-      assertThat(reclaimed.getFirst().attemptCount()).isEqualTo(1);
+      assertThat(reclaimed.getFirst().deliveryAttempt()).isEqualTo(1);
     }
   }
 
@@ -521,15 +521,15 @@ public abstract class ContinuumTck {
       int delivered =
           client.deliverResults(
               BatchSize.of(10),
-              (continuation, outcome) -> {
-                assertThat(continuation).isEqualTo("route-me");
-                assertThat(outcome).isEqualTo(new TypedOutcome.Success<>("the-answer"));
-                received.add(continuation);
+              delivery -> {
+                assertThat(delivery.continuation()).isEqualTo("route-me");
+                assertThat(delivery.outcome()).isEqualTo(new TypedOutcome.Success<>("the-answer"));
+                assertThat(delivery.deliveryAttempt()).isZero();
+                received.add(delivery.continuation());
               });
       assertThat(delivered).isEqualTo(1);
       assertThat(received).hasSize(1);
-      assertThat(client.deliverResults(BatchSize.of(10), (c, o) -> {}))
-          .isZero(); // acknowledged, gone
+      assertThat(client.deliverResults(BatchSize.of(10), d -> {})).isZero(); // acknowledged, gone
     }
 
     @Test
@@ -543,13 +543,13 @@ public abstract class ContinuumTck {
                   BatchSize.of(10),
                   Lease.ofSeconds(30),
                   Backoff.ofSeconds(10),
-                  (c, o) -> {
+                  d -> {
                     throw new IllegalStateException("consumer crash");
                   }))
           .isZero();
-      assertThat(client.deliverResults(BatchSize.of(10), (c, o) -> {})).isZero(); // backing off
+      assertThat(client.deliverResults(BatchSize.of(10), d -> {})).isZero(); // backing off
       instants.advance(Duration.ofSeconds(11));
-      assertThat(client.deliverResults(BatchSize.of(10), (c, o) -> {})).isEqualTo(1);
+      assertThat(client.deliverResults(BatchSize.of(10), d -> {})).isEqualTo(1);
     }
 
     @Test
@@ -592,7 +592,7 @@ public abstract class ContinuumTck {
       assertThat(continuum.find(computation.id()).orElseThrow().status())
           .isEqualTo(ComputationStatus.EXPIRED);
       var outcomes = new CopyOnWriteArrayList<TypedOutcome<String>>();
-      client.deliverResults(BatchSize.of(10), (continuation, outcome) -> outcomes.add(outcome));
+      client.deliverResults(BatchSize.of(10), d -> outcomes.add(d.outcome()));
       assertThat(outcomes)
           .containsExactly(
               new TypedOutcome.Expired<>(

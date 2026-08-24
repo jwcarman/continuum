@@ -23,9 +23,9 @@ import org.jwcarman.continuum.api.CompletionDelivery;
  *
  * @param id the outbox row's identity, used to acknowledge or fail the claim
  * @param delivery the delivery obligation to act on
- * @param attemptCount how many delivery attempts have already been made
+ * @param deliveryAttempt how many delivery attempts have already been made
  */
-public record ClaimedDelivery(DeliveryId id, CompletionDelivery delivery, int attemptCount) {
+public record ClaimedDelivery(DeliveryId id, CompletionDelivery delivery, int deliveryAttempt) {
 
   /**
    * Requires the outbox identity and the delivery it leases.
