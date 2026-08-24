@@ -13,17 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum;
+package org.jwcarman.continuum.api;
 
 import java.util.Objects;
-import java.util.UUID;
 
-public record ComputationId(UUID value) {
-  public ComputationId {
+public record ComputationKind(String value) {
+  public ComputationKind {
     Objects.requireNonNull(value, "value must not be null");
-  }
-
-  public static ComputationId random() {
-    return new ComputationId(UUID.randomUUID());
+    if (value.isBlank()) {
+      throw new IllegalArgumentException("value must not be blank");
+    }
   }
 }

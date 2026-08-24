@@ -17,7 +17,7 @@ package org.jwcarman.continuum.spi;
 
 import java.util.Arrays;
 import java.util.Objects;
-import org.jwcarman.continuum.ContinuationId;
+import org.jwcarman.continuum.api.ContinuationId;
 
 public record StoredContinuation(ContinuationId id, byte[] payload) {
 

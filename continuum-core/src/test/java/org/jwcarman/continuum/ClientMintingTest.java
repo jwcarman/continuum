@@ -34,6 +34,16 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.continuum.api.CompletionResult;
+import org.jwcarman.continuum.api.Computation;
+import org.jwcarman.continuum.api.ComputationId;
+import org.jwcarman.continuum.api.ComputationKind;
+import org.jwcarman.continuum.api.ComputationRequest;
+import org.jwcarman.continuum.api.ComputationStatus;
+import org.jwcarman.continuum.api.Outcome;
+import org.jwcarman.continuum.api.RegistrationResult;
+import org.jwcarman.continuum.api.TypedOutcome;
+import org.jwcarman.continuum.api.TypedRegistration;
 import org.mockito.ArgumentCaptor;
 
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)

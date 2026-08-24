@@ -13,21 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum;
+package org.jwcarman.continuum.api;
 
-import java.util.Objects;
+import java.time.Duration;
 
-public sealed interface RegistrationResult {
+public record Backoff(Duration value) implements TimeSpan {
 
-  record Registered(ContinuationId continuationId) implements RegistrationResult {
-    public Registered {
-      Objects.requireNonNull(continuationId, "continuationId must not be null");
-    }
+  public Backoff {
+    TimeSpan.requirePositive(value);
   }
 
-  record Resolved(Outcome outcome) implements RegistrationResult {
-    public Resolved {
-      Objects.requireNonNull(outcome, "outcome must not be null");
-    }
+  public static Backoff of(Duration value) {
+    return new Backoff(value);
+  }
+
+  public static Backoff ofSeconds(long seconds) {
+    return of(Duration.ofSeconds(seconds));
+  }
+
+  public static Backoff ofMinutes(long minutes) {
+    return of(Duration.ofMinutes(minutes));
+  }
+
+  public static Backoff ofHours(long hours) {
+    return of(Duration.ofHours(hours));
   }
 }

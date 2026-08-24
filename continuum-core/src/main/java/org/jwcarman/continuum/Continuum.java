@@ -17,6 +17,13 @@ package org.jwcarman.continuum;
 
 import java.time.InstantSource;
 import java.util.Optional;
+import org.jwcarman.continuum.api.CompletionResult;
+import org.jwcarman.continuum.api.Computation;
+import org.jwcarman.continuum.api.ComputationId;
+import org.jwcarman.continuum.api.ComputationKind;
+import org.jwcarman.continuum.api.ComputationRequest;
+import org.jwcarman.continuum.api.Outcome;
+import org.jwcarman.continuum.api.RegistrationResult;
 import org.jwcarman.continuum.spi.ContinuumRepository;
 
 public interface Continuum {

@@ -13,17 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum;
+package org.jwcarman.continuum.api;
 
-public record BatchSize(int value) {
-
-  public BatchSize {
-    if (value < 1) {
-      throw new IllegalArgumentException("value must be at least 1");
-    }
-  }
-
-  public static BatchSize of(int value) {
-    return new BatchSize(value);
-  }
+public enum CompletionResult {
+  COMPLETED,
+  ALREADY_RESOLVED,
+  NOT_FOUND
 }

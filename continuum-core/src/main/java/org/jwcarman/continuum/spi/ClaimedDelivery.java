@@ -16,7 +16,7 @@
 package org.jwcarman.continuum.spi;
 
 import java.util.Objects;
-import org.jwcarman.continuum.CompletionDelivery;
+import org.jwcarman.continuum.api.CompletionDelivery;
 
 public record ClaimedDelivery(DeliveryId id, CompletionDelivery delivery, int attemptCount) {
 

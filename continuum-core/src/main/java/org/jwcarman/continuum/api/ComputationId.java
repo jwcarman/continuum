@@ -13,16 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum;
+package org.jwcarman.continuum.api;
 
-import java.time.Duration;
-import java.util.function.BiConsumer;
+import java.util.Objects;
+import java.util.UUID;
 
-public interface RetryConfig<D> {
+public record ComputationId(UUID value) {
+  public ComputationId {
+    Objects.requireNonNull(value, "value must not be null");
+  }
 
-  RetryConfig<D> atMost(int attempts);
-
-  RetryConfig<D> timeout(Duration timeout);
-
-  RetryConfig<D> handler(BiConsumer<D, RetryContext> handler);
+  public static ComputationId random() {
+    return new ComputationId(UUID.randomUUID());
+  }
 }

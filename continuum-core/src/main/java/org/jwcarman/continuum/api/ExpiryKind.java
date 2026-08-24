@@ -13,17 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum;
+package org.jwcarman.continuum.api;
 
-import java.time.Instant;
-import java.util.Objects;
-
-public record RetryContext(
-    ComputationId computationId, ComputationKind kind, int attemptCount, Instant deadline) {
-
-  public RetryContext {
-    Objects.requireNonNull(computationId, "computationId must not be null");
-    Objects.requireNonNull(kind, "kind must not be null");
-    Objects.requireNonNull(deadline, "deadline must not be null");
-  }
+public enum ExpiryKind {
+  RETRY_DISALLOWED,
+  RETRY_EXHAUSTED
 }

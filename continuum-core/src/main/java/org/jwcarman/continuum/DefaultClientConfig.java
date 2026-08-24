@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.util.Objects;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
+import org.jwcarman.continuum.api.ComputationKind;
 
 final class DefaultClientConfig<R, C> implements ClientConfig<R, C> {
 

@@ -13,17 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum;
+package org.jwcarman.continuum.api;
 
-import java.util.Objects;
-import java.util.UUID;
+public class ComputationNotFoundException extends RuntimeException {
 
-public record ContinuationId(UUID value) {
-  public ContinuationId {
-    Objects.requireNonNull(value, "value must not be null");
-  }
-
-  public static ContinuationId random() {
-    return new ContinuationId(UUID.randomUUID());
+  public ComputationNotFoundException(ComputationId id) {
+    super("computation not found: " + id.value());
   }
 }

@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum;
+package org.jwcarman.continuum.retry;
 
-public class ComputationNotFoundException extends RuntimeException {
+@FunctionalInterface
+public interface RetryCustomizer<D> {
 
-  public ComputationNotFoundException(ComputationId id) {
-    super("computation not found: " + id.value());
-  }
+  void customize(RetryConfig<D> config);
 }

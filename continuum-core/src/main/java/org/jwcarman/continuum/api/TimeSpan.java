@@ -13,15 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum;
+package org.jwcarman.continuum.api;
 
+import java.time.Duration;
 import java.util.Objects;
 
-public record ComputationKind(String value) {
-  public ComputationKind {
+/**
+ * Common shape of the duration-valued pump parameters. Java statics are not inherited, so each
+ * implementation declares its own {@code of}/{@code ofSeconds}/{@code ofMinutes}/{@code ofHours}
+ * factories as one-liners; this interface carries the shared value shape and validation.
+ */
+public sealed interface TimeSpan permits Lease, Backoff, ResultTtl {
+
+  Duration value();
+
+  static Duration requirePositive(Duration value) {
     Objects.requireNonNull(value, "value must not be null");
-    if (value.isBlank()) {
-      throw new IllegalArgumentException("value must not be blank");
+    if (value.isZero() || value.isNegative()) {
+      throw new IllegalArgumentException("value must be positive");
     }
+    return value;
   }
 }

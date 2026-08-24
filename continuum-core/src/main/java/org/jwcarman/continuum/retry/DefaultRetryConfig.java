@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum;
+package org.jwcarman.continuum.retry;
 
 import java.time.Duration;
 import java.util.Objects;
 import java.util.function.BiConsumer;
-import org.jwcarman.continuum.Retry.RetryResult;
+import org.jwcarman.continuum.retry.Retry.RetryResult;
 
 final class DefaultRetryConfig<D> implements RetryConfig<D> {
 

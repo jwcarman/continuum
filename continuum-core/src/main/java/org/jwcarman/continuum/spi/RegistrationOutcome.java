@@ -16,7 +16,7 @@
 package org.jwcarman.continuum.spi;
 
 import java.util.Objects;
-import org.jwcarman.continuum.Outcome;
+import org.jwcarman.continuum.api.Outcome;
 
 public sealed interface RegistrationOutcome {
 

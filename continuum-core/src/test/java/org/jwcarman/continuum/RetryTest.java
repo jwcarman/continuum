@@ -26,7 +26,11 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.continuum.Retry.RetryResult;
+import org.jwcarman.continuum.api.ComputationId;
+import org.jwcarman.continuum.api.ComputationKind;
+import org.jwcarman.continuum.retry.Retry;
+import org.jwcarman.continuum.retry.Retry.RetryResult;
+import org.jwcarman.continuum.retry.RetryContext;
 
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class RetryTest {

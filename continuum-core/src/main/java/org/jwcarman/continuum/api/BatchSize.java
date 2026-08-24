@@ -13,29 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum;
+package org.jwcarman.continuum.api;
 
-import java.time.Duration;
+public record BatchSize(int value) {
 
-public record ResultTtl(Duration value) implements TimeSpan {
-
-  public ResultTtl {
-    TimeSpan.requirePositive(value);
+  public BatchSize {
+    if (value < 1) {
+      throw new IllegalArgumentException("value must be at least 1");
+    }
   }
 
-  public static ResultTtl of(Duration value) {
-    return new ResultTtl(value);
-  }
-
-  public static ResultTtl ofSeconds(long seconds) {
-    return of(Duration.ofSeconds(seconds));
-  }
-
-  public static ResultTtl ofMinutes(long minutes) {
-    return of(Duration.ofMinutes(minutes));
-  }
-
-  public static ResultTtl ofHours(long hours) {
-    return of(Duration.ofHours(hours));
+  public static BatchSize of(int value) {
+    return new BatchSize(value);
   }
 }

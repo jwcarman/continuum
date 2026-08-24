@@ -19,10 +19,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import org.jwcarman.continuum.Computation;
-import org.jwcarman.continuum.ComputationId;
-import org.jwcarman.continuum.ComputationKind;
-import org.jwcarman.continuum.Outcome;
+import org.jwcarman.continuum.api.Computation;
+import org.jwcarman.continuum.api.ComputationId;
+import org.jwcarman.continuum.api.ComputationKind;
+import org.jwcarman.continuum.api.Outcome;
 
 public interface ContinuumRepository {
 

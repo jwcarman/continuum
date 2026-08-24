@@ -27,7 +27,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.continuum.ComputationId;
+import org.jwcarman.continuum.api.ComputationId;
 import org.jwcarman.continuum.spi.ContinuumPersistenceException;
 
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)

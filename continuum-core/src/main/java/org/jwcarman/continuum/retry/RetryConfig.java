@@ -13,9 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum;
+package org.jwcarman.continuum.retry;
 
-public enum ExpiryKind {
-  RETRY_DISALLOWED,
-  RETRY_EXHAUSTED
+import java.time.Duration;
+import java.util.function.BiConsumer;
+
+public interface RetryConfig<D> {
+
+  RetryConfig<D> atMost(int attempts);
+
+  RetryConfig<D> timeout(Duration timeout);
+
+  RetryConfig<D> handler(BiConsumer<D, RetryContext> handler);
 }

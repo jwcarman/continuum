@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.continuum.ContinuationId;
+import org.jwcarman.continuum.api.ContinuationId;
 
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class SpiTypesTest {

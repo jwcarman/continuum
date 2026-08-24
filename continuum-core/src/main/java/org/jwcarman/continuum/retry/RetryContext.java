@@ -13,29 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum;
+package org.jwcarman.continuum.retry;
 
-import java.time.Duration;
+import java.time.Instant;
+import java.util.Objects;
+import org.jwcarman.continuum.api.ComputationId;
+import org.jwcarman.continuum.api.ComputationKind;
 
-public record Backoff(Duration value) implements TimeSpan {
+public record RetryContext(
+    ComputationId computationId, ComputationKind kind, int attemptCount, Instant deadline) {
 
-  public Backoff {
-    TimeSpan.requirePositive(value);
-  }
-
-  public static Backoff of(Duration value) {
-    return new Backoff(value);
-  }
-
-  public static Backoff ofSeconds(long seconds) {
-    return of(Duration.ofSeconds(seconds));
-  }
-
-  public static Backoff ofMinutes(long minutes) {
-    return of(Duration.ofMinutes(minutes));
-  }
-
-  public static Backoff ofHours(long hours) {
-    return of(Duration.ofHours(hours));
+  public RetryContext {
+    Objects.requireNonNull(computationId, "computationId must not be null");
+    Objects.requireNonNull(kind, "kind must not be null");
+    Objects.requireNonNull(deadline, "deadline must not be null");
   }
 }
