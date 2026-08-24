@@ -70,6 +70,8 @@ public interface Continuum {
     RegistrationResult registerContinuation(ComputationId id, byte[] continuationPayload);
     CompletionResult complete(ComputationId id, Outcome outcome);
     Optional<Computation> find(ComputationId id);
+    InstantSource instants();
+    // plus the default client(...) minting methods — section 2a
 }
 ```
 
@@ -126,7 +128,7 @@ dependencies, so `continuum-core` depends on it directly alongside slf4j-api).
       cfg -> cfg.codecs(new JacksonCodecFactory(mapper))
                 .deadline(Duration.ofMinutes(5))
                 .retries(Retry.atMost(3, (toolCall, ctx) -> {
-                    toolRuntime.dispatch(toolCall, ctx.invocationId());
+                    toolRuntime.dispatch(toolCall, ctx.computationId(), ctx.invocationId());
                     return RetryResult.retried();
                 })));
 
@@ -140,7 +142,10 @@ dependencies, so `continuum-core` depends on it directly alongside slf4j-api).
   payload codecs, with per-payload `Codec<T>` overrides available. The client
   is built entirely on the public byte[] API: `create(...)` encodes the
   continuation and dispatch payloads; `complete(id, R)` encodes the result;
-  registration decodes a `Resolved` outcome.
+  registration decodes a `Resolved` outcome. A two-type overload
+  `client(kind, R, C, cfg)` serves non-retryable kinds: no dispatch type, no
+  `Retry` permitted — making "dispatch payload without retry" and `Void.class`
+  filler both unrepresentable.
 
 - `Retry<D>` — the typed retry abstraction: one object that *performs* (or
   schedules) the redispatch itself and reports what it did:
