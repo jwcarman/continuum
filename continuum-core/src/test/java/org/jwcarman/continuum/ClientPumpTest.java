@@ -370,6 +370,44 @@ class ClientPumpTest {
     }
 
     @Test
+    void one_shot_create_honors_a_deadline_override_and_complete_encodes_success() {
+      when(continuum.create(any()))
+          .thenAnswer(
+              invocation -> {
+                ComputationRequest request = invocation.getArgument(0);
+                return new Computation(
+                    ComputationId.random(),
+                    request.kind(),
+                    ComputationStatus.PENDING,
+                    NOW,
+                    request.deadline(),
+                    request.dispatchPayload(),
+                    1,
+                    null);
+              });
+      when(continuum.complete(any(), any())).thenReturn(CompletionResult.COMPLETED);
+      var client =
+          continuum.client(
+              "tool",
+              String.class,
+              String.class,
+              cfg ->
+                  cfg.resultCodec(ClientMintingTest.STRINGS)
+                      .continuationCodec(ClientMintingTest.STRINGS)
+                      .deadline(Duration.ofMinutes(5)));
+
+      var computation = client.create("c", Duration.ofSeconds(15));
+      assertThat(computation.deadline()).isEqualTo(NOW.plus(Duration.ofSeconds(15)));
+
+      assertThat(client.complete(computation.id(), "done")).isEqualTo(CompletionResult.COMPLETED);
+      verify(continuum).complete(computation.id(), Outcome.success("done".getBytes(UTF_8)));
+
+      when(repository.claimDeliveries(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
+      assertThat(client.deliverResults(5, (c, o) -> {})).isZero();
+      assertThat(client.kind()).isEqualTo(KIND);
+    }
+
+    @Test
     void one_shot_fail_reports_a_producer_failure() {
       var client =
           continuum.client(

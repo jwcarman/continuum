@@ -158,6 +158,14 @@ class ValueTypesTest {
     }
 
     @Test
+    void success_is_never_equal_to_another_arm_or_type() {
+      var success = Outcome.success(new byte[] {1});
+      assertThat(success).isNotEqualTo(Outcome.failure("f"));
+      assertThat(success).isNotEqualTo("not an outcome");
+      assertThat(success).hasSameHashCodeAs(Outcome.success(new byte[] {1}));
+    }
+
+    @Test
     void outcome_arms_have_value_semantics() {
       assertThat(Outcome.failure("f")).isEqualTo(Outcome.failure("f"));
       assertThat(Outcome.expired(ExpiryKind.RETRY_EXHAUSTED, "m"))
