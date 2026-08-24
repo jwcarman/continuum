@@ -19,6 +19,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -26,6 +27,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.time.InstantSource;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -140,8 +142,50 @@ class DefaultContinuumTest {
     void maps_repository_outcomes() {
       var id = ComputationId.random();
       var outcome = Outcome.success("r".getBytes(UTF_8));
-      when(repository.complete(id, outcome, NOW)).thenReturn(CompletionOutcome.ALREADY_RESOLVED);
+      when(repository.complete(id, outcome, NOW))
+          .thenReturn(
+              CompletionOutcome.ALREADY_RESOLVED,
+              CompletionOutcome.COMPLETED,
+              CompletionOutcome.NOT_FOUND);
       assertThat(continuum.complete(id, outcome)).isEqualTo(CompletionResult.ALREADY_RESOLVED);
+      assertThat(continuum.complete(id, outcome)).isEqualTo(CompletionResult.COMPLETED);
+      assertThat(continuum.complete(id, outcome)).isEqualTo(CompletionResult.NOT_FOUND);
+    }
+
+    @Test
+    void complete_requires_id_and_outcome() {
+      var outcome = Outcome.failure("f");
+      var id = ComputationId.random();
+      assertThatNullPointerException().isThrownBy(() -> continuum.complete(null, outcome));
+      assertThatNullPointerException().isThrownBy(() -> continuum.complete(id, null));
+    }
+  }
+
+  @Nested
+  class Finding {
+    @Test
+    void find_delegates_to_the_repository() {
+      var id = ComputationId.random();
+      when(repository.findComputation(id)).thenReturn(Optional.empty());
+      assertThat(continuum.find(id)).isEmpty();
+      assertThatNullPointerException().isThrownBy(() -> continuum.find(null));
+    }
+  }
+
+  @Nested
+  class Null_checks {
+    @Test
+    void register_requires_id_and_payload() {
+      var id = ComputationId.random();
+      byte[] payload = "x".getBytes(UTF_8);
+      assertThatNullPointerException()
+          .isThrownBy(() -> continuum.registerContinuation(null, payload));
+      assertThatNullPointerException().isThrownBy(() -> continuum.registerContinuation(id, null));
+    }
+
+    @Test
+    void create_requires_a_request() {
+      assertThatNullPointerException().isThrownBy(() -> continuum.create(null));
     }
   }
 }

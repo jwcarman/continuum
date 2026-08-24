@@ -115,6 +115,18 @@ class InMemoryContinuumRepositoryTest {
   }
 
   @Test
+  void purge_stops_at_the_batch_limit() {
+    for (int i = 0; i < 2; i++) {
+      var id = ComputationId.random();
+      repository.createComputation(
+          pending(id), new StoredContinuation(ContinuationId.random(), "c".getBytes(UTF_8)));
+      repository.complete(id, Outcome.failure("f"), NOW.plusSeconds(1));
+    }
+    assertThat(repository.purgeResults(KIND, NOW.plusSeconds(600), 1)).isEqualTo(1);
+    assertThat(repository.purgeResults(KIND, NOW.plusSeconds(600), 10)).isEqualTo(1);
+  }
+
+  @Test
   void deadline_at_now_counts_as_expired() {
     var id = ComputationId.random();
     repository.createComputation(

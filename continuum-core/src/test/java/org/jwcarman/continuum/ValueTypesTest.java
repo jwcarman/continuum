@@ -160,6 +160,13 @@ class ValueTypesTest {
     }
 
     @Test
+    void non_retryable_request_to_string_reports_it() {
+      var request =
+          new ComputationRequest(new ComputationKind("k"), new byte[] {1}, Instant.EPOCH, null);
+      assertThat(request.toString()).contains("retryable=false");
+    }
+
+    @Test
     void computations_with_different_outcomes_differ() {
       assertThat(computation(null, Outcome.failure("f")))
           .isNotEqualTo(computation(null, Outcome.success(new byte[] {1})));
@@ -208,8 +215,8 @@ class ValueTypesTest {
     void success_is_never_equal_to_another_arm_or_type() {
       var success = Outcome.success(new byte[] {1});
       Object notAnOutcome = "not an outcome";
-      assertThat(success).isNotEqualTo(notAnOutcome);
       assertThat(success)
+          .isNotEqualTo(notAnOutcome)
           .isNotEqualTo(Outcome.failure("f"))
           .hasSameHashCodeAs(Outcome.success(new byte[] {1}));
     }
@@ -218,8 +225,8 @@ class ValueTypesTest {
     void computations_differ_when_any_field_differs() {
       var base = computation(new byte[] {1}, null);
       Object notAComputation = "not a computation";
-      assertThat(base).isNotEqualTo(notAComputation);
       assertThat(base)
+          .isNotEqualTo(notAComputation)
           .isNotEqualTo(
               new Computation(
                   ComputationId.random(),
@@ -287,8 +294,8 @@ class ValueTypesTest {
       var base =
           new ComputationRequest(new ComputationKind("k"), new byte[] {1}, Instant.EPOCH, null);
       Object notARequest = "not a request";
-      assertThat(base).isNotEqualTo(notARequest);
       assertThat(base)
+          .isNotEqualTo(notARequest)
           .isNotEqualTo(
               new ComputationRequest(new ComputationKind("o"), new byte[] {1}, Instant.EPOCH, null))
           .isNotEqualTo(
@@ -307,8 +314,8 @@ class ValueTypesTest {
           new CompletionDelivery(
               computationId, kind, continuationId, new byte[] {1}, Outcome.failure("f"));
       Object notADelivery = "not a delivery";
-      assertThat(base).isNotEqualTo(notADelivery);
       assertThat(base)
+          .isNotEqualTo(notADelivery)
           .isNotEqualTo(
               new CompletionDelivery(
                   ComputationId.random(),
@@ -343,8 +350,8 @@ class ValueTypesTest {
       var id = ContinuationId.random();
       var base = new StoredContinuation(id, new byte[] {1});
       Object notAContinuation = "not a continuation";
-      assertThat(base).isNotEqualTo(notAContinuation);
       assertThat(base)
+          .isNotEqualTo(notAContinuation)
           .isNotEqualTo(new StoredContinuation(ContinuationId.random(), new byte[] {1}))
           .isNotEqualTo(new StoredContinuation(id, new byte[] {2}));
     }
