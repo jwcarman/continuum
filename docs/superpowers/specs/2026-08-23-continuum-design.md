@@ -110,32 +110,72 @@ Serialization is pluggable via `org.jwcarman.codec` (`codec-core`:
 dependencies, so `continuum-core` depends on it directly alongside slf4j-api).
 
 - `ContinuumClient<R, C, D>` — the typed handle bound to one
-  `ComputationKind`, built via a builder that takes the `Continuum`, the kind,
-  a `CodecFactory`, and the result/continuation/dispatch types (with
-  per-payload `Codec<T>` overrides available). Built entirely on the public
-  byte[] API: `create(...)` encodes the continuation and dispatch payloads;
-  `complete(id, R)` encodes the result; registration decodes a `Resolved`
-  outcome.
+  `ComputationKind`, minted from the `Continuum` instance via a configurer
+  DSL. `Continuum.client(...)` is a `default` method that builds the client
+  purely from its arguments, so the interface itself stays the codec-free
+  byte[] contract:
 
   ```java
-  ContinuumClient<ToolResult, ToolContinuation, ToolCall> toolResults =
-      ContinuumClient.builder(continuum, TOOL_RESULT)
-          .codecs(codecFactory)
-          .resultType(ToolResult.class)
-          .continuationType(ToolContinuation.class)
-          .dispatchType(ToolCall.class)
-          .build();
+  var toolCalls = continuum.client(
+      "tool-result",
+      ToolCallResult.class, ToolCallContinuation.class, ToolCallDescriptor.class,
+      cfg -> cfg.codecs(new JacksonCodecFactory(mapper))
+                .deadline(Duration.ofMinutes(5))
+                .retries(Retry.atMost(3, (toolCall, ctx) -> {
+                    toolRuntime.dispatch(toolCall, ctx.invocationId());
+                    return RetryResult.retried();
+                })));
+
+  var computation = toolCalls.create(continuation, descriptor, invocationId);
+  toolCalls.complete(computation.id(), result);
   ```
+
+  Client config supplies creation defaults — `deadline(Duration)` (per-attempt
+  timeout; `create` computes `now + duration`, per-call override available)
+  and the kind's `Retry` (below). `codecs(CodecFactory)` resolves the three
+  payload codecs, with per-payload `Codec<T>` overrides available. The client
+  is built entirely on the public byte[] API: `create(...)` encodes the
+  continuation and dispatch payloads; `complete(id, R)` encodes the result;
+  registration decodes a `Resolved` outcome.
+
+- `Retry<D>` — the typed retry abstraction: one object that *performs* (or
+  schedules) the redispatch itself and reports what it did:
+
+  ```java
+  public interface Retry<D> {
+      RetryResult onTimeout(D dispatch, RetryContext ctx);
+
+      sealed interface RetryResult {
+          record Retried(Instant newDeadline) implements RetryResult {}
+          record RetriedFor(Duration timeout) implements RetryResult {} // now + timeout
+          record NotRetried(String reason) implements RetryResult {}
+      }
+  }
+  ```
+
+  The mapping to the core `RetryHandler` is exact: `Retried`/`RetriedFor` →
+  `Redispatched(newDeadline)`; `NotRetried` → `Abandon` →
+  `TIMEOUT_RETRY_EXHAUSTED`. A bare `retried()` defaults the new deadline to
+  the client's configured `deadline(Duration)`. `RetryContext` carries
+  `attemptCount`, `invocationId`, kind, metadata, and the expired deadline;
+  `D` is the decoded dispatch payload. Declarative policies are combinators
+  over this functional core — `Retry.atMost(n, inner)` returns
+  `NotRetried("attempts exhausted")` once `ctx.attemptCount() >= n` without
+  invoking the inner retry. A client configured with **no** `Retry` creates
+  `NON_RETRYABLE` computations — the presence of a `Retry` is what
+  `RETRYABLE` means at the typed layer; the `RetrySemantics` enum survives
+  only at the wire/storage level.
 
 - `DeliveryRouter` — the pump cannot be generic (it drains a mixed-kind
   outbox), so a router dispatches each `CompletionDelivery` by kind to a
   typed handler registered against a `ContinuumClient`
-  (`DeliveryRouter.builder().on(toolResults, handler)`), which decodes the
+  (`DeliveryRouter.builder().on(toolCalls, handler)`), which decodes the
   continuation payload and outcome before application code sees them.
   Unrouted kinds go to an explicit fallback: either a registered raw byte[]
   handler or fail-and-release (the delivery backs off rather than vanishing).
-  The same routing pattern applies to typed per-kind `RetryHandler`s, with
-  `dispatchPayload` decoded to `D`.
+  The reaper's typed routing needs no separate registration: each registered
+  client carries its own `Retry`, so the router derives the per-kind
+  `RetryHandler` from the same registrations deliveries use.
 - Concrete formats come from the codec project's backends: `codec-jackson`
   (Jackson 3), `codec-gson`, `codec-protobuf`. A Jackson 2 backend
   (`codec-jackson2`) is a follow-up in the codec repo — Continuum deliberately
@@ -175,7 +215,9 @@ int pump(); // returns number of expired computations processed
 The `RetryHandler` is a **required constructor argument** of the reaper (no
 global registry to forget; "no handler" is a compile error, not a runtime
 surprise) and is a **decision-returning** callback — retry policy lives in the
-application, not in Continuum:
+application, not in Continuum. (Applications using the typed layer rarely
+implement it directly: the `DeliveryRouter` derives it from each registered
+client's `Retry<D>`, section 2a.)
 
 ```java
 public interface RetryHandler {
