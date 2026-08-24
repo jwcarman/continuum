@@ -70,6 +70,7 @@
 
     <modules>
         <module>continuum-core</module>
+        <module>continuum-memory</module>
     </modules>
 
     <dependencyManagement>
