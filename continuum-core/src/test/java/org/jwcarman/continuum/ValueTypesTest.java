@@ -207,7 +207,8 @@ class ValueTypesTest {
     @Test
     void success_is_never_equal_to_another_arm_or_type() {
       var success = Outcome.success(new byte[] {1});
-      assertThat(success.equals("not an outcome")).isFalse();
+      Object notAnOutcome = "not an outcome";
+      assertThat(success).isNotEqualTo(notAnOutcome);
       assertThat(success)
           .isNotEqualTo(Outcome.failure("f"))
           .hasSameHashCodeAs(Outcome.success(new byte[] {1}));
@@ -216,7 +217,8 @@ class ValueTypesTest {
     @Test
     void computations_differ_when_any_field_differs() {
       var base = computation(new byte[] {1}, null);
-      assertThat(base.equals("not a computation")).isFalse();
+      Object notAComputation = "not a computation";
+      assertThat(base).isNotEqualTo(notAComputation);
       assertThat(base)
           .isNotEqualTo(
               new Computation(
@@ -284,7 +286,8 @@ class ValueTypesTest {
     void requests_differ_when_any_field_differs() {
       var base =
           new ComputationRequest(new ComputationKind("k"), new byte[] {1}, Instant.EPOCH, null);
-      assertThat(base.equals("not a request")).isFalse();
+      Object notARequest = "not a request";
+      assertThat(base).isNotEqualTo(notARequest);
       assertThat(base)
           .isNotEqualTo(
               new ComputationRequest(new ComputationKind("o"), new byte[] {1}, Instant.EPOCH, null))
@@ -303,7 +306,8 @@ class ValueTypesTest {
       var base =
           new CompletionDelivery(
               computationId, kind, continuationId, new byte[] {1}, Outcome.failure("f"));
-      assertThat(base.equals("not a delivery")).isFalse();
+      Object notADelivery = "not a delivery";
+      assertThat(base).isNotEqualTo(notADelivery);
       assertThat(base)
           .isNotEqualTo(
               new CompletionDelivery(
@@ -338,7 +342,8 @@ class ValueTypesTest {
     void stored_continuations_differ_when_any_field_differs() {
       var id = ContinuationId.random();
       var base = new StoredContinuation(id, new byte[] {1});
-      assertThat(base.equals("not a continuation")).isFalse();
+      Object notAContinuation = "not a continuation";
+      assertThat(base).isNotEqualTo(notAContinuation);
       assertThat(base)
           .isNotEqualTo(new StoredContinuation(ContinuationId.random(), new byte[] {1}))
           .isNotEqualTo(new StoredContinuation(id, new byte[] {2}));

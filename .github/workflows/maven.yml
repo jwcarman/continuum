@@ -32,4 +32,11 @@ jobs:
     - name: Build with Maven
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      run: mvn -Pci -B verify sonar:sonar
+      # Dependabot-triggered workflows cannot see repository secrets, so the
+      # SonarCloud step only runs when a token is present.
+      run: |
+        if [ -n "$SONAR_TOKEN" ]; then
+          mvn -Pci -B verify sonar:sonar
+        else
+          mvn -Pci -B verify
+        fi
