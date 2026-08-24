@@ -84,12 +84,13 @@ Decisions the specification left open:
    sources.
 4. **Storage and coordination are opaque `byte[]`** end to end — the outcome
    payload, the continuation payload, and the dispatch payload alike. The
-   `Continuum` interface, SPI, persistence, and pumps never see a codec.
-   Generics are deliberately rejected on `Continuum` itself: one instance
-   coordinates many kinds with different result/continuation/dispatch types,
-   and the delivery pump drains a mixed-kind outbox, so no single type
-   assignment is honest. Strong typing is provided by the kind-scoped client
-   layer (section 2a), where generics bind per kind.
+   `Continuum` interface is exactly the specification's byte[] contract (§32):
+   no codec accessor, no type parameters, nothing serialization-aware. Generics
+   are deliberately rejected on `Continuum` itself: one instance coordinates
+   many kinds with different result/continuation/dispatch types, and the
+   delivery pump drains a mixed-kind outbox, so no single type assignment is
+   honest. Strong typing is provided by `ContinuumClient<R, C, D>`
+   (section 2a), where generics bind per kind.
 5. **Dispatch payload (retry breadcrumb)** — `ComputationRequest` accepts an
    optional opaque `byte[] dispatchPayload` meaning "how to (re)dispatch this
    work," mirroring the continuation payload's "what to do with the result." It
@@ -99,32 +100,49 @@ Decisions the specification left open:
    dispatch state may leave it null and use `invocationId` as a foreign key.
    It is a write-once breadcrumb, not mutable workflow state (non-goal §3).
 
-## 2a. Typed kind-scoped client layer (`continuum-core`)
+## 2a. `ContinuumClient<R, C, D>` — the typed primary API (`continuum-core`)
 
-Callers work with user-defined types; serialization is pluggable via
-`org.jwcarman.codec` (`codec-core`: `Codec<T>` / `CodecFactory` / `TypeRef` —
-three files, zero transitive dependencies, so `continuum-core` depends on it
-directly alongside slf4j-api).
+The layering mirrors how Nessy rides Substrate: the byte[]-based thing is the
+underlying coordination/storage contract (`Continuum` + the SPI), and the
+typed API callers actually program against is named for the library.
+Serialization is pluggable via `org.jwcarman.codec` (`codec-core`:
+`Codec<T>` / `CodecFactory` / `TypeRef` — three files, zero transitive
+dependencies, so `continuum-core` depends on it directly alongside slf4j-api).
 
-- `KindClient<R, C, D>` — a typed facade bound to one `ComputationKind` plus a
-  `CodecFactory` and the result/continuation/dispatch types. Built entirely on
-  the public byte[] API: `create(...)` encodes the continuation and dispatch
-  payloads; `complete(id, R)` encodes the result; registration decodes a
-  `Resolved` outcome.
+- `ContinuumClient<R, C, D>` — the typed handle bound to one
+  `ComputationKind`, built via a builder that takes the `Continuum`, the kind,
+  a `CodecFactory`, and the result/continuation/dispatch types (with
+  per-payload `Codec<T>` overrides available). Built entirely on the public
+  byte[] API: `create(...)` encodes the continuation and dispatch payloads;
+  `complete(id, R)` encodes the result; registration decodes a `Resolved`
+  outcome.
+
+  ```java
+  ContinuumClient<ToolResult, ToolContinuation, ToolCall> toolResults =
+      ContinuumClient.builder(continuum, TOOL_RESULT)
+          .codecs(codecFactory)
+          .resultType(ToolResult.class)
+          .continuationType(ToolContinuation.class)
+          .dispatchType(ToolCall.class)
+          .build();
+  ```
+
 - `DeliveryRouter` — the pump cannot be generic (it drains a mixed-kind
   outbox), so a router dispatches each `CompletionDelivery` by kind to a
-  kind-bound typed handler that decodes the continuation payload and outcome
-  before application code sees them. Unrouted kinds go to an explicit
-  fallback: either a registered raw byte[] handler or fail-and-release (the
-  delivery backs off rather than vanishing). The same routing pattern applies
-  to typed per-kind `RetryHandler`s, with `dispatchPayload` decoded to `D`.
+  typed handler registered against a `ContinuumClient`
+  (`DeliveryRouter.builder().on(toolResults, handler)`), which decodes the
+  continuation payload and outcome before application code sees them.
+  Unrouted kinds go to an explicit fallback: either a registered raw byte[]
+  handler or fail-and-release (the delivery backs off rather than vanishing).
+  The same routing pattern applies to typed per-kind `RetryHandler`s, with
+  `dispatchPayload` decoded to `D`.
 - Concrete formats come from the codec project's backends: `codec-jackson`
   (Jackson 3), `codec-gson`, `codec-protobuf`. A Jackson 2 backend
   (`codec-jackson2`) is a follow-up in the codec repo — Continuum deliberately
   ships no serialization-format modules of its own; its module list stays
   about persistence providers.
-- The raw byte[] API remains public and documented — it is what the typed
-  layer is built on, and an escape hatch for polyglot payloads.
+- The raw byte[] `Continuum` API remains public and documented — it is what
+  the typed layer is built on, and an escape hatch for polyglot payloads.
 
 ## 3. Pump components (no threads)
 
