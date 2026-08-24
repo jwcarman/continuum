@@ -140,10 +140,10 @@ router, p -> p.batchSize(...).lease(...).workerId(...))`, and
       ToolCallResult.class, ToolCallContinuation.class, ToolCallDescriptor.class,
       cfg -> cfg.codecs(new JacksonCodecFactory(mapper))
                 .deadline(Duration.ofMinutes(5))
-                .retries(Retry.atMost(3, (toolCall, ctx) -> {
-                    toolRuntime.dispatch(toolCall, ctx.computationId(), ctx.invocationId());
-                    return RetryResult.retried();
-                })));
+                .retries(Retry.of(r -> r
+                    .atMost(3)
+                    .handler((toolCall, ctx) ->
+                        toolRuntime.dispatch(toolCall, ctx.computationId(), ctx.invocationId())))));
 
   var computation = toolCalls.create(continuation, descriptor, invocationId);
   toolCalls.complete(computation.id(), result);
@@ -194,10 +194,21 @@ router, p -> p.batchSize(...).lease(...).workerId(...))`, and
   carries `computationId` (the redispatched worker needs it to `complete()`),
   `invocationId`, `attemptCount`, metadata, the expired deadline, and kind;
   `D` is the decoded dispatch payload — the payload is the application's
-  vocabulary, the context is Continuum's durable facts. Declarative policies are
-  combinators over this functional core — `Retry.atMost(n, inner)` returns
-  `NotRetried("attempts exhausted")` once `ctx.attemptCount() >= n` without
-  invoking the inner retry. A client configured with **no** `Retry` creates
+  vocabulary, the context is Continuum's durable facts.
+
+  The declarative front door is `Retry.of(customizer)` — the house customizer
+  idiom one level down. Its config takes `atMost(n)`, a
+  `handler(BiConsumer<D, RetryContext>)` that *only dispatches*, and
+  optionally `timeout(Duration)` for retry deadlines differing from first
+  attempts. The factory-built `Retry` derives results mechanically: attempts
+  exhausted → `NotRetried("attempts exhausted")` without invoking the
+  handler; otherwise invoke the consumer and report `RetriedDefault` (or
+  `Retried(t)` when `timeout(t)` was configured). A handler exception
+  propagates to the reaper's no-decision path (computation untouched, next
+  pump retries). Implementing the `Retry<D>` interface directly remains the
+  escape hatch for decisions the config cannot express (attempt-dependent
+  backoff, circuit breakers) — the same relationship `ContinuumClient` has
+  to raw `Continuum`. A client configured with **no** `Retry` creates
   `NON_RETRYABLE` computations — the presence of a `Retry` is what
   `RETRYABLE` means at the typed layer; the `RetrySemantics` enum survives
   only at the wire/storage level.
