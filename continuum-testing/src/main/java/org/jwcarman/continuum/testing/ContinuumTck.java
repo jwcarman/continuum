@@ -62,6 +62,11 @@ import org.jwcarman.continuum.spi.CompletionOutcome;
 import org.jwcarman.continuum.spi.ContinuumRepository;
 
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
+/**
+ * The provider certification battery. Extend, supply {@link #createRepository()}, and inherit
+ * lifecycle semantics, the registration-vs-completion and complete-vs-complete races, competing
+ * consumers, lease expiry, late registration, expiry outcomes, and purge behavior.
+ */
 public abstract class ContinuumTck {
 
   protected static final ComputationKind KIND = new ComputationKind("tck");

@@ -19,6 +19,11 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Objects;
 
+/**
+ * A request to create a computation: the kind, the mandatory initial continuation payload, the
+ * absolute deadline, and an optional dispatch payload — its presence makes the computation
+ * retryable.
+ */
 public record ComputationRequest(
     ComputationKind kind, byte[] continuationPayload, Instant deadline, byte[] dispatchPayload) {
 

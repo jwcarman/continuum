@@ -15,6 +15,7 @@
  */
 package org.jwcarman.continuum.spi;
 
+/** A persistence operation failed; the enclosing transaction was rolled back. */
 public class ContinuumPersistenceException extends RuntimeException {
 
   public ContinuumPersistenceException(String message) {

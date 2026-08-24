@@ -18,6 +18,13 @@ package org.jwcarman.continuum.api;
 import java.util.Arrays;
 import java.util.Objects;
 
+/**
+ * The terminal resolution of a computation, three-armed: the producer answered ({@link Success}),
+ * the producer said no ({@link Failure}), or the deadline passed with no answer ({@link Expired}).
+ * A producer reporting failure and a deadline lapsing are different facts — a known "no" versus
+ * "never heard back" — and consumers switch on exactly that distinction. {@code Expired} is minted
+ * only by timeout processing; {@code Continuum.complete} rejects it.
+ */
 public sealed interface Outcome {
 
   record Success(byte[] payload) implements Outcome {

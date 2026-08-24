@@ -15,6 +15,7 @@
  */
 package org.jwcarman.continuum.api;
 
+/** How many items one pump call may process; at least 1. */
 public record BatchSize(int value) {
 
   public BatchSize {

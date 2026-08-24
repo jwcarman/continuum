@@ -16,6 +16,7 @@
 package org.jwcarman.continuum.retry;
 
 @FunctionalInterface
+/** Fills in a {@link RetryConfig} — the only thing a customizer ever does. */
 public interface RetryCustomizer<D> {
 
   void customize(RetryConfig<D> config);

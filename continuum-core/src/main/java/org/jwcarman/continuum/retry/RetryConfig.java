@@ -18,6 +18,10 @@ package org.jwcarman.continuum.retry;
 import java.time.Duration;
 import java.util.function.BiConsumer;
 
+/**
+ * Declarative retry configuration: {@code atMost(n)} total attempts, an optional retry-specific
+ * {@code timeout}, and a handler that <em>only dispatches</em> — results are derived mechanically.
+ */
 public interface RetryConfig<D> {
 
   RetryConfig<D> atMost(int attempts);

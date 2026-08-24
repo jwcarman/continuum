@@ -13,24 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum.spi;
-
-import java.util.Objects;
-import org.jwcarman.continuum.api.Outcome;
-
 /**
- * The repository-level answer to a registration: registered, resolved with the memoized outcome, or
- * unknown.
+ * Spring Boot auto-configuration: a {@code Continuum} over the best available repository — an
+ * application-defined bean wins, then JDBC when {@code continuum-jdbc} and a {@code DataSource} are
+ * present, then the in-memory fallback with a warning. Clients and pump scheduling remain
+ * application concerns.
  */
-public sealed interface RegistrationOutcome {
-
-  record Registered() implements RegistrationOutcome {}
-
-  record Resolved(Outcome outcome) implements RegistrationOutcome {
-    public Resolved {
-      Objects.requireNonNull(outcome, "outcome must not be null");
-    }
-  }
-
-  record NotFound() implements RegistrationOutcome {}
-}
+package org.jwcarman.continuum.autoconfigure;

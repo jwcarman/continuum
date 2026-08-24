@@ -17,6 +17,12 @@ package org.jwcarman.continuum.api;
 
 import java.util.Objects;
 
+/**
+ * The typed mirror of {@link RegistrationResult}: durably {@link Registered}, or {@link Resolved}
+ * with the decoded outcome.
+ *
+ * @param <R> the decoded result type
+ */
 public sealed interface TypedRegistration<R> {
 
   record Registered<R>(ContinuationId continuationId) implements TypedRegistration<R> {

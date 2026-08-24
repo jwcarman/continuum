@@ -15,6 +15,10 @@
  */
 package org.jwcarman.continuum.api;
 
+/**
+ * The derived status of a computation — never stored, always a reading of durable facts: pending
+ * record present, or the memoized outcome's arm.
+ */
 public enum ComputationStatus {
   PENDING,
   COMPLETED,

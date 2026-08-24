@@ -44,6 +44,12 @@ import org.jwcarman.continuum.spi.DeliveryId;
 import org.jwcarman.continuum.spi.RegistrationOutcome;
 import org.jwcarman.continuum.spi.StoredContinuation;
 
+/**
+ * PostgreSQL persistence over a plain {@link DataSource}. Completion is a single-transaction
+ * ownership transfer; outbox claiming uses {@code FOR UPDATE SKIP LOCKED} so competing consumers
+ * never block. Schema is application-owned — see the classpath resource {@code
+ * continuum-postgresql.sql}.
+ */
 public final class JdbcContinuumRepository implements ContinuumRepository {
 
   private static final String ATTEMPT_COUNT_COLUMN = "attempt_count";

@@ -16,6 +16,7 @@
 package org.jwcarman.continuum;
 
 @FunctionalInterface
+/** Fills in a {@link RetryableClientConfig} — the only thing a customizer ever does. */
 public interface RetryableClientCustomizer<R, C, D> {
 
   void customize(RetryableClientConfig<R, C, D> config);

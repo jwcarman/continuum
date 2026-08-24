@@ -13,24 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum.spi;
-
-import java.util.Objects;
-import org.jwcarman.continuum.api.Outcome;
-
 /**
- * The repository-level answer to a registration: registered, resolved with the memoized outcome, or
- * unknown.
+ * The persistence contract: {@link org.jwcarman.continuum.spi.ContinuumRepository} defines the
+ * semantic atomic operations a provider must implement — not generic CRUD. Providers certify
+ * themselves by extending the TCK in {@code continuum-testing}. All payloads are opaque {@code
+ * byte[]} at this layer; durations arrive resolved to absolute instants.
  */
-public sealed interface RegistrationOutcome {
-
-  record Registered() implements RegistrationOutcome {}
-
-  record Resolved(Outcome outcome) implements RegistrationOutcome {
-    public Resolved {
-      Objects.requireNonNull(outcome, "outcome must not be null");
-    }
-  }
-
-  record NotFound() implements RegistrationOutcome {}
-}
+package org.jwcarman.continuum.spi;

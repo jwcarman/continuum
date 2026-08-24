@@ -18,6 +18,11 @@ package org.jwcarman.continuum.api;
 import java.util.Arrays;
 import java.util.Objects;
 
+/**
+ * One self-contained delivery obligation: everything a consumer needs to act on a terminal outcome
+ * without reconstructing transient state. {@code continuationId} is the stable deduplication key
+ * for at-least-once delivery.
+ */
 public record CompletionDelivery(
     ComputationId computationId,
     ComputationKind kind,

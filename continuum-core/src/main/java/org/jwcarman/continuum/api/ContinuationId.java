@@ -18,6 +18,10 @@ package org.jwcarman.continuum.api;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * The identity of one registered continuation — assigned by Continuum, and the stable deduplication
+ * key for at-least-once delivery.
+ */
 public record ContinuationId(UUID value) {
   public ContinuationId {
     Objects.requireNonNull(value, "value must not be null");

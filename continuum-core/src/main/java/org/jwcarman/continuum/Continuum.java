@@ -26,6 +26,12 @@ import org.jwcarman.continuum.api.Outcome;
 import org.jwcarman.continuum.api.RegistrationResult;
 import org.jwcarman.continuum.spi.ContinuumRepository;
 
+/**
+ * The byte[] coordination contract — a durable, memoized eventual-value primitive. One computation
+ * has one globally unique identity, one terminal outcome, and any number of durable continuations
+ * interested in that outcome. Payloads are opaque at this layer; the typed clients minted by {@link
+ * #client} put codecs over the boundary.
+ */
 public interface Continuum {
 
   Computation create(ComputationRequest request);

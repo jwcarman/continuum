@@ -17,6 +17,7 @@ package org.jwcarman.continuum.api;
 
 import java.util.Objects;
 
+/** The named category a computation belongs to — e.g. {@code tool-result}, {@code approval}. */
 public record ComputationKind(String value) {
   public ComputationKind {
     Objects.requireNonNull(value, "value must not be null");

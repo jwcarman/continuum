@@ -15,6 +15,7 @@
  */
 package org.jwcarman.continuum.spi;
 
+/** The repository-level answer to a completion attempt. */
 public enum CompletionOutcome {
   COMPLETED,
   ALREADY_RESOLVED,

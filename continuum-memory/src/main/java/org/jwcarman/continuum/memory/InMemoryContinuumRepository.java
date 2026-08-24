@@ -38,6 +38,11 @@ import org.jwcarman.continuum.spi.DeliveryId;
 import org.jwcarman.continuum.spi.RegistrationOutcome;
 import org.jwcarman.continuum.spi.StoredContinuation;
 
+/**
+ * A faithful in-JVM {@link ContinuumRepository} — TCK-certified, real atomicity under a single
+ * lock, lease-honoring claims. For tests and embedded single-process use; nothing survives a
+ * restart.
+ */
 public final class InMemoryContinuumRepository implements ContinuumRepository {
 
   private final Object lock = new Object();

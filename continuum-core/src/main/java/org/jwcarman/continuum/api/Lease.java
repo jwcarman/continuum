@@ -17,6 +17,10 @@ package org.jwcarman.continuum.api;
 
 import java.time.Duration;
 
+/**
+ * How long a claimed delivery stays invisible to other claimers. Must exceed the worst-case
+ * consumer time, or another node may reclaim mid-processing.
+ */
 public record Lease(Duration value) implements TimeSpan {
 
   public Lease {

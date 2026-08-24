@@ -18,6 +18,7 @@ package org.jwcarman.continuum.spi;
 import java.util.Objects;
 import java.util.UUID;
 
+/** The identity of one outbox row. */
 public record DeliveryId(UUID value) {
 
   public DeliveryId {

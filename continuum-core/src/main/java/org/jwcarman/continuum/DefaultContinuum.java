@@ -31,6 +31,11 @@ import org.jwcarman.continuum.spi.ContinuumRepository;
 import org.jwcarman.continuum.spi.RegistrationOutcome;
 import org.jwcarman.continuum.spi.StoredContinuation;
 
+/**
+ * The standard {@link Continuum}: coordination logic over a {@link ContinuumRepository}. There is
+ * one time authority per instance — the given {@link InstantSource} — from which all deadline
+ * arithmetic derives.
+ */
 public record DefaultContinuum(ContinuumRepository repository, InstantSource instants)
     implements Continuum {
 

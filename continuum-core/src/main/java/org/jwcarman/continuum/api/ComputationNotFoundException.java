@@ -15,6 +15,10 @@
  */
 package org.jwcarman.continuum.api;
 
+/**
+ * Registration against an unknown computation — one that never existed, or whose memoized result
+ * has been purged.
+ */
 public class ComputationNotFoundException extends RuntimeException {
 
   public ComputationNotFoundException(ComputationId id) {

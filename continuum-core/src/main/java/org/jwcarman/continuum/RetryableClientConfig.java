@@ -19,6 +19,11 @@ import java.time.Duration;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
 
+/**
+ * Creation-time configuration for a retryable client: codecs (including the dispatch codec) and the
+ * per-attempt deadline. Fluent, no {@code build()} — the minting factory applies the customizer and
+ * builds privately.
+ */
 public interface RetryableClientConfig<R, C, D> {
 
   RetryableClientConfig<R, C, D> codecs(CodecFactory factory);

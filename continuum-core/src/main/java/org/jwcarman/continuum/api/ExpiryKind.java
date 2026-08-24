@@ -15,6 +15,11 @@
  */
 package org.jwcarman.continuum.api;
 
+/**
+ * Which reap path expired a computation: {@link #RETRY_DISALLOWED} — the kind was never retryable
+ * (no dispatch payload existed); {@link #RETRY_EXHAUSTED} — retrying was possible and the retry
+ * declined to continue. Each value can only be minted by its own path, so consumers can trust it.
+ */
 public enum ExpiryKind {
   RETRY_DISALLOWED,
   RETRY_EXHAUSTED

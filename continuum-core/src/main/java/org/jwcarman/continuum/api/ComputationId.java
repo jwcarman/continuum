@@ -18,6 +18,7 @@ package org.jwcarman.continuum.api;
 import java.util.Objects;
 import java.util.UUID;
 
+/** The globally unique, opaque identity of a computation — all a producer needs to complete it. */
 public record ComputationId(UUID value) {
   public ComputationId {
     Objects.requireNonNull(value, "value must not be null");

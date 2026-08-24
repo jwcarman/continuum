@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.Objects;
 import org.jwcarman.continuum.api.ContinuationId;
 
+/** A continuation as persisted: its Continuum-assigned identity and opaque payload. */
 public record StoredContinuation(ContinuationId id, byte[] payload) {
 
   public StoredContinuation {

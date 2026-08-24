@@ -80,19 +80,14 @@ class InMemoryContinuumRepositoryTest {
     var id = ComputationId.random();
     repository.createComputation(
         pending(id), new StoredContinuation(ContinuationId.random(), "c".getBytes(UTF_8)));
+    var duplicate = pending(id);
+    var duplicateContinuation =
+        new StoredContinuation(ContinuationId.random(), "c".getBytes(UTF_8));
     assertThatExceptionOfType(ContinuumPersistenceException.class)
-        .isThrownBy(
-            () ->
-                repository.createComputation(
-                    pending(id),
-                    new StoredContinuation(ContinuationId.random(), "c".getBytes(UTF_8))));
+        .isThrownBy(() -> repository.createComputation(duplicate, duplicateContinuation));
     repository.complete(id, Outcome.failure("f"), NOW.plusSeconds(1));
     assertThatExceptionOfType(ContinuumPersistenceException.class)
-        .isThrownBy(
-            () ->
-                repository.createComputation(
-                    pending(id),
-                    new StoredContinuation(ContinuationId.random(), "c".getBytes(UTF_8))));
+        .isThrownBy(() -> repository.createComputation(duplicate, duplicateContinuation));
   }
 
   @Test

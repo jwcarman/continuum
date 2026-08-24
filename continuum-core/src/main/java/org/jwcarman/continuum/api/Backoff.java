@@ -17,6 +17,7 @@ package org.jwcarman.continuum.api;
 
 import java.time.Duration;
 
+/** How long a failed delivery waits before becoming claimable again. */
 public record Backoff(Duration value) implements TimeSpan {
 
   public Backoff {

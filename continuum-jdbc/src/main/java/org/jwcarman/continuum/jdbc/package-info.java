@@ -13,24 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.continuum.spi;
-
-import java.util.Objects;
-import org.jwcarman.continuum.api.Outcome;
-
 /**
- * The repository-level answer to a registration: registered, resolved with the memoized outcome, or
- * unknown.
+ * PostgreSQL persistence over a plain {@code DataSource}. Deliberately Postgres-flavored — claiming
+ * uses {@code FOR UPDATE SKIP LOCKED} — rather than lowest-common-denominator ANSI. The reference
+ * DDL ships as the classpath resource {@code org/jwcarman/continuum/jdbc/continuum-postgresql.sql};
+ * applications own schema management and Continuum never executes DDL.
  */
-public sealed interface RegistrationOutcome {
-
-  record Registered() implements RegistrationOutcome {}
-
-  record Resolved(Outcome outcome) implements RegistrationOutcome {
-    public Resolved {
-      Objects.requireNonNull(outcome, "outcome must not be null");
-    }
-  }
-
-  record NotFound() implements RegistrationOutcome {}
-}
+package org.jwcarman.continuum.jdbc;

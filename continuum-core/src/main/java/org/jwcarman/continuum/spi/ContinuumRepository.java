@@ -24,6 +24,14 @@ import org.jwcarman.continuum.api.ComputationId;
 import org.jwcarman.continuum.api.ComputationKind;
 import org.jwcarman.continuum.api.Outcome;
 
+/**
+ * The persistence contract: semantic atomic operations, not generic CRUD. The correctness heart:
+ * {@code createComputation} persists the computation and its initial continuation as one unit;
+ * {@code registerContinuation} is atomic against completion (durable registration or the memoized
+ * outcome, never neither); {@code complete} performs the ownership transfer — delete the pending
+ * record, write the result, fan out one outbox delivery per continuation — in one transaction.
+ * Certify implementations against the TCK in {@code continuum-testing}.
+ */
 public interface ContinuumRepository {
 
   void createComputation(Computation computation, StoredContinuation initial);

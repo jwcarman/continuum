@@ -18,6 +18,7 @@ package org.jwcarman.continuum.spi;
 import java.util.Objects;
 import org.jwcarman.continuum.api.CompletionDelivery;
 
+/** One leased outbox item: the delivery, its outbox identity, and how many attempts preceded. */
 public record ClaimedDelivery(DeliveryId id, CompletionDelivery delivery, int attemptCount) {
 
   public ClaimedDelivery {

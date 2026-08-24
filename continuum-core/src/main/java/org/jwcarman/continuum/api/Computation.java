@@ -19,6 +19,12 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Objects;
 
+/**
+ * The durable view of a computation. Status is always derived, never stored: {@code PENDING} while
+ * a pending record exists, otherwise a 1:1 reading of the memoized outcome. {@code dispatchPayload}
+ * presence is what retryable means; {@code attemptCount} starts at 1 (the original dispatch is
+ * attempt one) and is the only retry state Continuum persists.
+ */
 public record Computation(
     ComputationId id,
     ComputationKind kind,

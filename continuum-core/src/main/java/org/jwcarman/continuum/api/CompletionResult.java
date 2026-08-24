@@ -15,6 +15,11 @@
  */
 package org.jwcarman.continuum.api;
 
+/**
+ * The answer to a completion attempt: {@link #COMPLETED} — this call won; {@link #ALREADY_RESOLVED}
+ * — the outcome was already sealed (a late or duplicate report); {@link #NOT_FOUND} — no such
+ * computation, or its result has been purged.
+ */
 public enum CompletionResult {
   COMPLETED,
   ALREADY_RESOLVED,

@@ -17,6 +17,10 @@ package org.jwcarman.continuum.api;
 
 import java.time.Duration;
 
+/**
+ * How long memoized results outlive completion before purging. Results are a coordination memo, not
+ * an audit log — they only need to outlive the last plausible late registrant.
+ */
 public record ResultTtl(Duration value) implements TimeSpan {
 
   public ResultTtl {

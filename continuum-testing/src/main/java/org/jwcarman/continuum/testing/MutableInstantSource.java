@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.InstantSource;
 import java.util.Objects;
 
+/** A settable, advanceable {@link InstantSource} so tests own time. */
 public final class MutableInstantSource implements InstantSource {
 
   private volatile Instant current;

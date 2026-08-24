@@ -20,6 +20,11 @@ import java.util.Objects;
 import org.jwcarman.continuum.api.ComputationId;
 import org.jwcarman.continuum.api.ComputationKind;
 
+/**
+ * Continuum's durable facts about an expired computation, handed to a {@link Retry}: where the
+ * redispatched worker must report ({@code computationId}), the kind, how many attempts have run
+ * ({@code attemptCount} — the original dispatch was attempt 1), and the deadline that expired.
+ */
 public record RetryContext(
     ComputationId computationId, ComputationKind kind, int attemptCount, Instant deadline) {
 

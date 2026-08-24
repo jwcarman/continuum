@@ -17,6 +17,12 @@ package org.jwcarman.continuum.api;
 
 import java.util.Objects;
 
+/**
+ * The typed mirror of {@link Outcome}, produced by a client's codecs: {@link Success} carries the
+ * decoded result value; {@link Failure} and {@link Expired} carry the same facts as their raw arms.
+ *
+ * @param <R> the decoded result type
+ */
 public sealed interface TypedOutcome<R> {
 
   record Success<R>(R value) implements TypedOutcome<R> {

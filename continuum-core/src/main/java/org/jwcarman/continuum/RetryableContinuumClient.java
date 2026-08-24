@@ -36,6 +36,16 @@ import org.jwcarman.continuum.retry.RetryContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * The typed client for a <em>retryable</em> kind: every computation carries a dispatch payload (the
+ * write-once "how to restart this work" breadcrumb — embed your idempotency key in it), and {@link
+ * #reapExpiredComputations(BatchSize, Retry)} consults a {@link Retry} for overdue computations.
+ * Minted by {@code continuum.client(kind, resultType, continuationType, dispatchType, customizer)}.
+ *
+ * @param <R> the result type
+ * @param <C> the continuation type ("what receives the result")
+ * @param <D> the dispatch type ("how to restart the work")
+ */
 public final class RetryableContinuumClient<R, C, D> {
 
   private static final Logger log = LoggerFactory.getLogger(RetryableContinuumClient.class);

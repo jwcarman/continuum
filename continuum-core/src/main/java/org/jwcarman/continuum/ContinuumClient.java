@@ -29,6 +29,15 @@ import org.jwcarman.continuum.api.ResultTtl;
 import org.jwcarman.continuum.api.TypedOutcome;
 import org.jwcarman.continuum.api.TypedRegistration;
 
+/**
+ * The typed client for a <em>non-retryable</em> kind: computations carry no dispatch payload, so
+ * nothing can ever be redispatched and {@link #reapExpiredComputations(BatchSize)} expires overdue
+ * computations unconditionally as {@code Expired(RETRY_DISALLOWED, ...)}. Minted by {@code
+ * continuum.client(kind, resultType, continuationType, customizer)}.
+ *
+ * @param <R> the result type
+ * @param <C> the continuation type ("what receives the result")
+ */
 public final class ContinuumClient<R, C> {
 
   private final ClientSupport<R, C> support;

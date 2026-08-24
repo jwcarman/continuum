@@ -207,17 +207,17 @@ class ValueTypesTest {
     @Test
     void success_is_never_equal_to_another_arm_or_type() {
       var success = Outcome.success(new byte[] {1});
+      assertThat(success.equals("not an outcome")).isFalse();
       assertThat(success)
           .isNotEqualTo(Outcome.failure("f"))
-          .isNotEqualTo("not an outcome")
           .hasSameHashCodeAs(Outcome.success(new byte[] {1}));
     }
 
     @Test
     void computations_differ_when_any_field_differs() {
       var base = computation(new byte[] {1}, null);
+      assertThat(base.equals("not a computation")).isFalse();
       assertThat(base)
-          .isNotEqualTo("not a computation")
           .isNotEqualTo(
               new Computation(
                   ComputationId.random(),
@@ -284,8 +284,8 @@ class ValueTypesTest {
     void requests_differ_when_any_field_differs() {
       var base =
           new ComputationRequest(new ComputationKind("k"), new byte[] {1}, Instant.EPOCH, null);
+      assertThat(base.equals("not a request")).isFalse();
       assertThat(base)
-          .isNotEqualTo("not a request")
           .isNotEqualTo(
               new ComputationRequest(new ComputationKind("o"), new byte[] {1}, Instant.EPOCH, null))
           .isNotEqualTo(
@@ -303,8 +303,8 @@ class ValueTypesTest {
       var base =
           new CompletionDelivery(
               computationId, kind, continuationId, new byte[] {1}, Outcome.failure("f"));
+      assertThat(base.equals("not a delivery")).isFalse();
       assertThat(base)
-          .isNotEqualTo("not a delivery")
           .isNotEqualTo(
               new CompletionDelivery(
                   ComputationId.random(),
@@ -338,8 +338,8 @@ class ValueTypesTest {
     void stored_continuations_differ_when_any_field_differs() {
       var id = ContinuationId.random();
       var base = new StoredContinuation(id, new byte[] {1});
+      assertThat(base.equals("not a continuation")).isFalse();
       assertThat(base)
-          .isNotEqualTo("not a continuation")
           .isNotEqualTo(new StoredContinuation(ContinuationId.random(), new byte[] {1}))
           .isNotEqualTo(new StoredContinuation(id, new byte[] {2}));
     }

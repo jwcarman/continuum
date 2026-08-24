@@ -16,6 +16,7 @@
 package org.jwcarman.continuum;
 
 @FunctionalInterface
+/** Fills in a {@link ClientConfig} — the only thing a customizer ever does. */
 public interface ClientCustomizer<R, C> {
 
   void customize(ClientConfig<R, C> config);

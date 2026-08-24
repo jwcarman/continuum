@@ -17,6 +17,11 @@ package org.jwcarman.continuum.api;
 
 import java.util.Objects;
 
+/**
+ * The atomic answer to "register my interest": either the continuation was durably {@link
+ * Registered} (a delivery is now guaranteed), or the computation had already resolved and the
+ * memoized outcome comes back as {@link Resolved}. Never neither.
+ */
 public sealed interface RegistrationResult {
 
   record Registered(ContinuationId continuationId) implements RegistrationResult {

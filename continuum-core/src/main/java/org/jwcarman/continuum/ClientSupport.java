@@ -47,6 +47,7 @@ final class ClientSupport<R, C> {
   static final Backoff DEFAULT_BACKOFF = Backoff.ofSeconds(30);
 
   private static final Logger log = LoggerFactory.getLogger(ClientSupport.class);
+  private static final String BATCH_SIZE_NULL_MESSAGE = "batchSize must not be null";
 
   private final Continuum continuum;
   private final ComputationKind kind;
@@ -125,7 +126,7 @@ final class ClientSupport<R, C> {
 
   int deliverResults(
       BatchSize batchSize, Lease lease, Backoff backoff, BiConsumer<C, TypedOutcome<R>> consumer) {
-    Objects.requireNonNull(batchSize, "batchSize must not be null");
+    Objects.requireNonNull(batchSize, BATCH_SIZE_NULL_MESSAGE);
     Objects.requireNonNull(lease, "lease must not be null");
     Objects.requireNonNull(backoff, "backoff must not be null");
     Objects.requireNonNull(consumer, "consumer must not be null");
@@ -149,7 +150,7 @@ final class ClientSupport<R, C> {
   }
 
   int purgeExpiredResults(BatchSize batchSize, ResultTtl ttl) {
-    Objects.requireNonNull(batchSize, "batchSize must not be null");
+    Objects.requireNonNull(batchSize, BATCH_SIZE_NULL_MESSAGE);
     Objects.requireNonNull(ttl, "ttl must not be null");
     return continuum.repository().purgeResults(kind, now().minus(ttl.value()), batchSize.value());
   }
@@ -159,7 +160,7 @@ final class ClientSupport<R, C> {
   }
 
   List<Computation> findExpired(BatchSize batchSize) {
-    Objects.requireNonNull(batchSize, "batchSize must not be null");
+    Objects.requireNonNull(batchSize, BATCH_SIZE_NULL_MESSAGE);
     return continuum.repository().findExpired(kind, now(), batchSize.value());
   }
 }
