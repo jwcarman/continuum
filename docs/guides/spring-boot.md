@@ -6,7 +6,7 @@ Add the starter:
 <dependency>
     <groupId>org.jwcarman.continuum</groupId>
     <artifactId>continuum-spring-boot-starter</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
