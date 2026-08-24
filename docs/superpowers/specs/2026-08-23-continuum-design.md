@@ -199,7 +199,7 @@ Cross-cutting decisions:
    retryability. Embed your external idempotency key in it. It is a
    write-once breadcrumb, not mutable workflow state (spec non-goal §3).
 
-## 4. `ContinuumClient<R, C, D>` — the typed primary API (`continuum-core`)
+## 4. `ContinuumClient` / `RetryableContinuumClient` — the typed primary API (`continuum-core`)
 
 The layering mirrors how Nessy rides Substrate: the byte[]-based thing is the
 underlying coordination/storage contract (`Continuum` + the SPI), and the typed
@@ -237,7 +237,7 @@ var approvals = continuum.client(
 its arguments. `ClientConfig<R, C, D>`: `codecs(CodecFactory)` resolves the
 payload codecs (per-payload `Codec<T>` overrides available);
 `deadline(Duration)` is the per-attempt timeout default (`create` computes
-`now + duration`; per-call override available). **The two-type overload is the
+`now + duration`; per-call override available). **The two-type overload mints `ContinuumClient` — the
 non-retryable spelling**: no dispatch type, no dispatch payload ever
 persisted — "dispatch payload without retry support" and `Void.class` filler
 are both unrepresentable. Retry *policy* does not live on the client config —
@@ -262,17 +262,42 @@ String)`; `TypedRegistration<R>` is `Registered(ContinuationId)` |
 There are no pump/worker/router classes. The client is bound to its kind and
 owns its codecs, so the three recurring activities are **batch methods on the
 client**; the application schedules them on whatever cadence and machinery it
-likes, per kind:
+likes, per kind.
+
+The two shapes are two distinct final classes — deliberately unrelated (no
+inheritance: extending would leak `create(continuation)` and the always-fail
+reap onto the retryable shape, exactly the calls the split exists to
+forbid). The shared surface appears on both, duplication absorbed by a
+package-private support class; extracting a common interface later is
+non-breaking if ever needed:
 
 ```java
-public final class ContinuumClient<R, C, D> {
-    ...
+public final class ContinuumClient<R, C> {          // continuum.client(kind, R, C, cfg)
+    Computation create(C continuation);
+    CompletionResult complete(ComputationId id, R result);
+    CompletionResult fail(ComputationId id, String message);
+    TypedRegistration<R> register(ComputationId id, C continuation);
     int deliverResults(int batchSize, BiConsumer<C, TypedOutcome<R>> consumer);
-    int reapExpiredComputations(int batchSize, Retry<D> retry);    // three-type shape
-    int reapExpiredComputations(int batchSize);                    // two-type shape
+    int reapExpiredComputations(int batchSize);     // always Expired(RETRY_DISALLOWED, ...)
     int purgeExpiredResults(int batchSize, Duration ttl);
+    ComputationKind kind();
+}
+
+public final class RetryableContinuumClient<R, C, D> {  // continuum.client(kind, R, C, D, cfg)
+    Computation create(C continuation, D dispatch);
+    CompletionResult complete(ComputationId id, R result);
+    CompletionResult fail(ComputationId id, String message);
+    TypedRegistration<R> register(ComputationId id, C continuation);
+    int deliverResults(int batchSize, BiConsumer<C, TypedOutcome<R>> consumer);
+    int reapExpiredComputations(int batchSize, Retry<D> retry);
+    int purgeExpiredResults(int batchSize, Duration ttl);
+    ComputationKind kind();
 }
 ```
+
+The unmarked name is the simple, non-retryable case; the marked name
+advertises what it adds in the same breath as its extra type parameter —
+"retryable is the one with a dispatch type." 
 
 Each call processes one bounded batch and returns the count — the drain
 signal (`while (client.deliverResults(...) > 0)` after downtime). Scheduling
@@ -477,6 +502,6 @@ TDD throughout, building in dependency order:
 
 1. core (API types, SPI, `DefaultContinuum`),
 2. memory provider + TCK (validating both together),
-3. typed layer (`ContinuumClient` with pump methods, `Retry`),
+3. typed layer (`ContinuumClient`/`RetryableContinuumClient` with pump methods, `Retry`),
 4. jdbc provider against the TCK,
 5. bom, docs, CI workflows, publishing setup.
