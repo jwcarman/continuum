@@ -6,7 +6,7 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.continuum.Continuum;
-import org.jwcarman.continuum.memory.InMemoryContinuumRepository;
+import org.jwcarman.continuum.jdbc.JdbcContinuumRepository;
 import org.jwcarman.continuum.spi.ContinuumRepository;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.WebApplicationType;
@@ -30,8 +30,11 @@ class AutoConfigurationImportsTest {
   void the_imports_file_registers_the_auto_configurations() {
     try (ConfigurableApplicationContext context =
         new SpringApplicationBuilder(EmptyApplication.class).web(WebApplicationType.NONE).run()) {
+      // H2 and spring-boot-jdbc are on the test classpath, so Boot's own
+      // DataSourceAutoConfiguration also activates via discovery and our JDBC provider
+      // must win over the memory fallback — proving imports AND ordering end to end.
       assertThat(context.getBean(ContinuumRepository.class))
-          .isInstanceOf(InMemoryContinuumRepository.class);
+          .isInstanceOf(JdbcContinuumRepository.class);
       assertThat(context.getBean(Continuum.class)).isNotNull();
     }
   }
