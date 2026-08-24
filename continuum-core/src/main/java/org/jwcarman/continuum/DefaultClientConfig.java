@@ -93,9 +93,6 @@ final class DefaultClientConfig<R, C> implements ClientConfig<R, C> {
         kind,
         resolve(resultCodec, resultType, "result"),
         resolve(continuationCodec, continuationType, "continuation"),
-        deadline,
-        lease,
-        backoff,
-        workerId);
+        new ClientSupport.ClientSettings(deadline, lease, backoff, workerId));
   }
 }

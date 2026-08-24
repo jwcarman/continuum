@@ -96,10 +96,10 @@ class OutboxFailureInjectionIT {
         new StoredContinuation(ContinuationId.random(), "c".getBytes(UTF_8)));
 
     failOutboxInsert.set(true);
+    var outcome = Outcome.success("r".getBytes(UTF_8));
+    var completedAt = NOW.plusSeconds(1);
     assertThatExceptionOfType(ContinuumPersistenceException.class)
-        .isThrownBy(
-            () ->
-                repository.complete(id, Outcome.success("r".getBytes(UTF_8)), NOW.plusSeconds(1)));
+        .isThrownBy(() -> repository.complete(id, outcome, completedAt));
     failOutboxInsert.set(false);
 
     // nothing committed: still pending, continuation intact, no result, no outbox rows

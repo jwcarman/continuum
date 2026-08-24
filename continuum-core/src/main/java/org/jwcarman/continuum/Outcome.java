@@ -27,7 +27,7 @@ public sealed interface Outcome {
 
     @Override
     public boolean equals(Object o) {
-      return o instanceof Success other && Arrays.equals(payload, other.payload);
+      return o instanceof Success(byte[] otherPayload) && Arrays.equals(payload, otherPayload);
     }
 
     @Override

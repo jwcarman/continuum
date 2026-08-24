@@ -16,6 +16,7 @@
 package org.jwcarman.continuum;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Objects;
 
 public record Computation(
@@ -41,5 +42,37 @@ public record Computation(
 
   public boolean retryable() {
     return dispatchPayload != null;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    return o instanceof Computation other
+        && attemptCount == other.attemptCount
+        && id.equals(other.id)
+        && kind.equals(other.kind)
+        && status == other.status
+        && createdAt.equals(other.createdAt)
+        && deadline.equals(other.deadline)
+        && Arrays.equals(dispatchPayload, other.dispatchPayload)
+        && Objects.equals(outcome, other.outcome);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        id,
+        kind,
+        status,
+        createdAt,
+        deadline,
+        Arrays.hashCode(dispatchPayload),
+        attemptCount,
+        outcome);
+  }
+
+  @Override
+  public String toString() {
+    return "Computation[id=%s, kind=%s, status=%s, attemptCount=%d, outcome=%s]"
+        .formatted(id.value(), kind.value(), status, attemptCount, outcome);
   }
 }

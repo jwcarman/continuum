@@ -16,6 +16,7 @@
 package org.jwcarman.continuum;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Objects;
 
 public record ComputationRequest(
@@ -25,5 +26,26 @@ public record ComputationRequest(
     Objects.requireNonNull(kind, "kind must not be null");
     Objects.requireNonNull(continuationPayload, "continuationPayload must not be null");
     Objects.requireNonNull(deadline, "deadline must not be null");
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    return o instanceof ComputationRequest other
+        && kind.equals(other.kind)
+        && Arrays.equals(continuationPayload, other.continuationPayload)
+        && deadline.equals(other.deadline)
+        && Arrays.equals(dispatchPayload, other.dispatchPayload);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        kind, Arrays.hashCode(continuationPayload), deadline, Arrays.hashCode(dispatchPayload));
+  }
+
+  @Override
+  public String toString() {
+    return "ComputationRequest[kind=%s, deadline=%s, retryable=%b]"
+        .formatted(kind.value(), deadline, dispatchPayload != null);
   }
 }

@@ -22,14 +22,14 @@ import org.jwcarman.continuum.spi.ContinuumRepository;
 import org.jwcarman.continuum.spi.RegistrationOutcome;
 import org.jwcarman.continuum.spi.StoredContinuation;
 
-public final class DefaultContinuum implements Continuum {
+public record DefaultContinuum(ContinuumRepository repository, InstantSource instants)
+    implements Continuum {
 
-  private final ContinuumRepository repository;
-  private final InstantSource instants;
+  private static final String ID_NULL_MESSAGE = "id must not be null";
 
-  public DefaultContinuum(ContinuumRepository repository, InstantSource instants) {
-    this.repository = Objects.requireNonNull(repository, "repository must not be null");
-    this.instants = Objects.requireNonNull(instants, "instants must not be null");
+  public DefaultContinuum {
+    Objects.requireNonNull(repository, "repository must not be null");
+    Objects.requireNonNull(instants, "instants must not be null");
   }
 
   @Override
@@ -53,7 +53,7 @@ public final class DefaultContinuum implements Continuum {
 
   @Override
   public RegistrationResult registerContinuation(ComputationId id, byte[] continuationPayload) {
-    Objects.requireNonNull(id, "id must not be null");
+    Objects.requireNonNull(id, ID_NULL_MESSAGE);
     Objects.requireNonNull(continuationPayload, "continuationPayload must not be null");
     ContinuationId continuationId = ContinuationId.random();
     return switch (repository.registerContinuation(
@@ -67,7 +67,7 @@ public final class DefaultContinuum implements Continuum {
 
   @Override
   public CompletionResult complete(ComputationId id, Outcome outcome) {
-    Objects.requireNonNull(id, "id must not be null");
+    Objects.requireNonNull(id, ID_NULL_MESSAGE);
     Objects.requireNonNull(outcome, "outcome must not be null");
     if (outcome instanceof Outcome.Expired) {
       throw new IllegalArgumentException(
@@ -82,17 +82,7 @@ public final class DefaultContinuum implements Continuum {
 
   @Override
   public Optional<Computation> find(ComputationId id) {
-    Objects.requireNonNull(id, "id must not be null");
+    Objects.requireNonNull(id, ID_NULL_MESSAGE);
     return repository.findComputation(id);
-  }
-
-  @Override
-  public InstantSource instants() {
-    return instants;
-  }
-
-  @Override
-  public ContinuumRepository repository() {
-    return repository;
   }
 }

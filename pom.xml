@@ -83,6 +83,23 @@
         <sonar.organization>jwcarman</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <sonar.projectKey>jwcarman_continuum</sonar.projectKey>
+        <!--
+          ContinuumTck ships JUnit test classes in src/main so provider modules can
+          extend them; its snake_case method and nested-class names are this
+          project's deliberate test style (S100/S101 assume production naming).
+          TypedOutcome/TypedRegistration's type parameter binds the sealed arms
+          together and appears in every consumer signature (e.g.
+          BiConsumer<C, TypedOutcome<R>>); it is structural, not unused (S2326).
+        -->
+        <sonar.issue.ignore.multicriteria>tckMethods,tckClasses,typedOutcomeGeneric,typedRegistrationGeneric</sonar.issue.ignore.multicriteria>
+        <sonar.issue.ignore.multicriteria.tckMethods.ruleKey>java:S100</sonar.issue.ignore.multicriteria.tckMethods.ruleKey>
+        <sonar.issue.ignore.multicriteria.tckMethods.resourceKey>**/testing/ContinuumTck.java</sonar.issue.ignore.multicriteria.tckMethods.resourceKey>
+        <sonar.issue.ignore.multicriteria.tckClasses.ruleKey>java:S101</sonar.issue.ignore.multicriteria.tckClasses.ruleKey>
+        <sonar.issue.ignore.multicriteria.tckClasses.resourceKey>**/testing/ContinuumTck.java</sonar.issue.ignore.multicriteria.tckClasses.resourceKey>
+        <sonar.issue.ignore.multicriteria.typedOutcomeGeneric.ruleKey>java:S2326</sonar.issue.ignore.multicriteria.typedOutcomeGeneric.ruleKey>
+        <sonar.issue.ignore.multicriteria.typedOutcomeGeneric.resourceKey>**/TypedOutcome.java</sonar.issue.ignore.multicriteria.typedOutcomeGeneric.resourceKey>
+        <sonar.issue.ignore.multicriteria.typedRegistrationGeneric.ruleKey>java:S2326</sonar.issue.ignore.multicriteria.typedRegistrationGeneric.ruleKey>
+        <sonar.issue.ignore.multicriteria.typedRegistrationGeneric.resourceKey>**/TypedRegistration.java</sonar.issue.ignore.multicriteria.typedRegistrationGeneric.resourceKey>
     </properties>
 
     <modules>

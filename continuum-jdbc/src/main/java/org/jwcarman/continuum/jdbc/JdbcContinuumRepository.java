@@ -46,6 +46,8 @@ import org.jwcarman.continuum.spi.StoredContinuation;
 
 public final class JdbcContinuumRepository implements ContinuumRepository {
 
+  private static final String ATTEMPT_COUNT_COLUMN = "attempt_count";
+
   private final DataSource dataSource;
 
   public JdbcContinuumRepository(DataSource dataSource) {
@@ -77,23 +79,28 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
   public void createComputation(Computation computation, StoredContinuation initial) {
     inTransaction(
         connection -> {
-          try (PreparedStatement insert =
-              connection.prepareStatement(
-                  "INSERT INTO continuum_computation "
-                      + "(id, kind, deadline_at, dispatch_payload, attempt_count, created_at, last_updated_at) "
-                      + "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
-            insert.setObject(1, computation.id().value());
-            insert.setString(2, computation.kind().value());
-            insert.setTimestamp(3, Timestamp.from(computation.deadline()));
-            insert.setBytes(4, computation.dispatchPayload());
-            insert.setInt(5, computation.attemptCount());
-            insert.setTimestamp(6, Timestamp.from(computation.createdAt()));
-            insert.setTimestamp(7, Timestamp.from(computation.createdAt()));
-            insert.executeUpdate();
-          }
+          insertComputationRow(connection, computation);
           insertContinuation(connection, computation.id(), initial, computation.createdAt());
           return null;
         });
+  }
+
+  private void insertComputationRow(Connection connection, Computation computation)
+      throws SQLException {
+    try (PreparedStatement insert =
+        connection.prepareStatement(
+            "INSERT INTO continuum_computation "
+                + "(id, kind, deadline_at, dispatch_payload, attempt_count, created_at, last_updated_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
+      insert.setObject(1, computation.id().value());
+      insert.setString(2, computation.kind().value());
+      insert.setTimestamp(3, Timestamp.from(computation.deadline()));
+      insert.setBytes(4, computation.dispatchPayload());
+      insert.setInt(5, computation.attemptCount());
+      insert.setTimestamp(6, Timestamp.from(computation.createdAt()));
+      insert.setTimestamp(7, Timestamp.from(computation.createdAt()));
+      insert.executeUpdate();
+    }
   }
 
   private void insertContinuation(
@@ -155,24 +162,25 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
             insert.setTimestamp(10, Timestamp.from(completedAt));
             insert.executeUpdate();
           }
-          for (StoredContinuation continuation : readContinuations(connection, id)) {
-            try (PreparedStatement insert =
-                connection.prepareStatement(
-                    "INSERT INTO continuum_outbox "
-                        + "(id, computation_id, continuation_id, kind, continuation_payload, "
-                        + " outcome_type, outcome_payload, expiry_kind, message, available_at, "
-                        + " attempt_count, created_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)")) {
+          try (PreparedStatement insert =
+              connection.prepareStatement(
+                  "INSERT INTO continuum_outbox "
+                      + "(id, computation_id, continuation_id, kind, continuation_payload, "
+                      + " outcome_type, outcome_payload, expiry_kind, message, available_at, "
+                      + " attempt_count, created_at) "
+                      + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)")) {
+            insert.setObject(2, id.value());
+            insert.setString(4, pending.kind().value());
+            setOutcomeColumns(insert, 6, outcome);
+            insert.setTimestamp(10, Timestamp.from(completedAt));
+            insert.setTimestamp(11, Timestamp.from(completedAt));
+            for (StoredContinuation continuation : readContinuations(connection, id)) {
               insert.setObject(1, DeliveryId.random().value());
-              insert.setObject(2, id.value());
               insert.setObject(3, continuation.id().value());
-              insert.setString(4, pending.kind().value());
               insert.setBytes(5, continuation.payload());
-              setOutcomeColumns(insert, 6, outcome);
-              insert.setTimestamp(10, Timestamp.from(completedAt));
-              insert.setTimestamp(11, Timestamp.from(completedAt));
-              insert.executeUpdate();
+              insert.addBatch();
             }
+            insert.executeBatch();
           }
           executeUpdate(
               connection, "DELETE FROM continuum_continuation WHERE computation_id = ?", id);
@@ -214,7 +222,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
         row.getTimestamp("created_at").toInstant(),
         row.getTimestamp("deadline_at").toInstant(),
         row.getBytes("dispatch_payload"),
-        row.getInt("attempt_count"),
+        row.getInt(ATTEMPT_COUNT_COLUMN),
         null);
   }
 
@@ -255,23 +263,23 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
   private static void setOutcomeColumns(
       PreparedStatement statement, int firstIndex, Outcome outcome) throws SQLException {
     switch (outcome) {
-      case Outcome.Success success -> {
+      case Outcome.Success(byte[] payload) -> {
         statement.setString(firstIndex, "SUCCESS");
-        statement.setBytes(firstIndex + 1, success.payload());
+        statement.setBytes(firstIndex + 1, payload);
         statement.setString(firstIndex + 2, null);
         statement.setString(firstIndex + 3, null);
       }
-      case Outcome.Failure failure -> {
+      case Outcome.Failure(String message) -> {
         statement.setString(firstIndex, "FAILURE");
         statement.setBytes(firstIndex + 1, null);
         statement.setString(firstIndex + 2, null);
-        statement.setString(firstIndex + 3, failure.message());
+        statement.setString(firstIndex + 3, message);
       }
-      case Outcome.Expired expired -> {
+      case Outcome.Expired(ExpiryKind expiryKind, String message) -> {
         statement.setString(firstIndex, "EXPIRED");
         statement.setBytes(firstIndex + 1, null);
-        statement.setString(firstIndex + 2, expired.kind().name());
-        statement.setString(firstIndex + 3, expired.message());
+        statement.setString(firstIndex + 2, expiryKind.name());
+        statement.setString(firstIndex + 3, message);
       }
     }
   }
@@ -321,7 +329,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                       row.getTimestamp("created_at").toInstant(),
                       row.getTimestamp("deadline_at").toInstant(),
                       null,
-                      row.getInt("attempt_count"),
+                      row.getInt(ATTEMPT_COUNT_COLUMN),
                       outcome));
             }
           }
@@ -357,16 +365,16 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                             new ContinuationId(row.getObject("continuation_id", UUID.class)),
                             row.getBytes("continuation_payload"),
                             readOutcome(row)),
-                        row.getInt("attempt_count")));
+                        row.getInt(ATTEMPT_COUNT_COLUMN)));
               }
             }
           }
           try (PreparedStatement update =
               connection.prepareStatement(
                   "UPDATE continuum_outbox SET claimed_by = ?, claimed_until = ? WHERE id = ?")) {
+            update.setString(1, workerId);
+            update.setTimestamp(2, Timestamp.from(now.plus(lease)));
             for (ClaimedDelivery delivery : claimed) {
-              update.setString(1, workerId);
-              update.setTimestamp(2, Timestamp.from(now.plus(lease)));
               update.setObject(3, delivery.id().value());
               update.addBatch();
             }
