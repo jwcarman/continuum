@@ -430,8 +430,7 @@ public abstract class ContinuumTck {
               cfg.resultCodec(strings)
                   .continuationCodec(strings)
                   .dispatchCodec(strings)
-                  .deadline(Duration.ofMinutes(5))
-                  .backoff(Duration.ofSeconds(10)));
+                  .deadline(Duration.ofMinutes(5)));
     }
 
     private ContinuumClient<String, String> oneShot() {
@@ -472,6 +471,8 @@ public abstract class ContinuumTck {
       assertThat(
               client.deliverResults(
                   10,
+                  Duration.ofSeconds(30),
+                  Duration.ofSeconds(10),
                   (c, o) -> {
                     throw new IllegalStateException("consumer crash");
                   }))

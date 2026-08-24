@@ -30,10 +30,4 @@ public interface RetryableClientConfig<R, C, D> {
   RetryableClientConfig<R, C, D> dispatchCodec(Codec<D> codec);
 
   RetryableClientConfig<R, C, D> deadline(Duration deadline);
-
-  RetryableClientConfig<R, C, D> lease(Duration lease);
-
-  RetryableClientConfig<R, C, D> backoff(Duration backoff);
-
-  RetryableClientConfig<R, C, D> workerId(String workerId);
 }

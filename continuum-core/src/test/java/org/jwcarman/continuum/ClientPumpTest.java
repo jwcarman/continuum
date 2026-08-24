@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -70,10 +71,7 @@ class ClientPumpTest {
             cfg.resultCodec(ClientMintingTest.STRINGS)
                 .continuationCodec(ClientMintingTest.STRINGS)
                 .dispatchCodec(ClientMintingTest.STRINGS)
-                .deadline(Duration.ofMinutes(5))
-                .lease(Duration.ofSeconds(45))
-                .backoff(Duration.ofSeconds(20))
-                .workerId("w-test"));
+                .deadline(Duration.ofMinutes(5)));
   }
 
   private Computation expired(byte[] dispatchPayload, int attemptCount) {
@@ -91,10 +89,19 @@ class ClientPumpTest {
   @Nested
   class Delivering {
     @Test
-    void configured_worker_id_and_lease_are_used_for_claims() {
+    void call_site_lease_is_used_for_claims() {
+      when(repository.claimDeliveries(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
+      retryable().deliverResults(7, Duration.ofSeconds(45), Duration.ofSeconds(20), (c, o) -> {});
+      verify(repository)
+          .claimDeliveries(any(), eq(KIND), eq(7), eq(Duration.ofSeconds(45)), eq(NOW));
+    }
+
+    @Test
+    void default_lease_is_used_when_not_supplied() {
       when(repository.claimDeliveries(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
       retryable().deliverResults(7, (c, o) -> {});
-      verify(repository).claimDeliveries("w-test", KIND, 7, Duration.ofSeconds(45), NOW);
+      verify(repository)
+          .claimDeliveries(any(), eq(KIND), eq(7), eq(Duration.ofSeconds(30)), eq(NOW));
     }
 
     @Test
@@ -116,6 +123,8 @@ class ClientPumpTest {
           retryable()
               .deliverResults(
                   10,
+                  Duration.ofSeconds(30),
+                  Duration.ofSeconds(20),
                   (c, o) -> {
                     throw new IllegalStateException("boom");
                   });

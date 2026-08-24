@@ -57,7 +57,13 @@ public final class RetryableContinuumClient<R, C, D> {
   }
 
   public int deliverResults(int batchSize, BiConsumer<C, TypedOutcome<R>> consumer) {
-    return support.deliverResults(batchSize, consumer);
+    return support.deliverResults(
+        batchSize, ClientSupport.DEFAULT_LEASE, ClientSupport.DEFAULT_BACKOFF, consumer);
+  }
+
+  public int deliverResults(
+      int batchSize, Duration lease, Duration backoff, BiConsumer<C, TypedOutcome<R>> consumer) {
+    return support.deliverResults(batchSize, lease, backoff, consumer);
   }
 
   public int reapExpiredComputations(int batchSize, Retry<D> retry) {

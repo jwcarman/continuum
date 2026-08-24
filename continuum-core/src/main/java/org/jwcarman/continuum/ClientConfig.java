@@ -28,10 +28,4 @@ public interface ClientConfig<R, C> {
   ClientConfig<R, C> continuationCodec(Codec<C> codec);
 
   ClientConfig<R, C> deadline(Duration deadline);
-
-  ClientConfig<R, C> lease(Duration lease);
-
-  ClientConfig<R, C> backoff(Duration backoff);
-
-  ClientConfig<R, C> workerId(String workerId);
 }

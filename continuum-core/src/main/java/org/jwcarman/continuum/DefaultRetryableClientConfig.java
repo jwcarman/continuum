@@ -17,7 +17,6 @@ package org.jwcarman.continuum;
 
 import java.time.Duration;
 import java.util.Objects;
-import java.util.UUID;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
 
@@ -30,9 +29,6 @@ final class DefaultRetryableClientConfig<R, C, D> implements RetryableClientConf
   private Codec<C> continuationCodec;
   private Codec<D> dispatchCodec;
   private Duration deadline;
-  private Duration lease = Duration.ofSeconds(30);
-  private Duration backoff = Duration.ofSeconds(30);
-  private String workerId = "worker-" + UUID.randomUUID();
 
   @Override
   public RetryableClientConfig<R, C, D> codecs(CodecFactory factory) {
@@ -64,24 +60,6 @@ final class DefaultRetryableClientConfig<R, C, D> implements RetryableClientConf
     return this;
   }
 
-  @Override
-  public RetryableClientConfig<R, C, D> lease(Duration lease) {
-    this.lease = Objects.requireNonNull(lease, "lease must not be null");
-    return this;
-  }
-
-  @Override
-  public RetryableClientConfig<R, C, D> backoff(Duration backoff) {
-    this.backoff = Objects.requireNonNull(backoff, "backoff must not be null");
-    return this;
-  }
-
-  @Override
-  public RetryableClientConfig<R, C, D> workerId(String workerId) {
-    this.workerId = Objects.requireNonNull(workerId, "workerId must not be null");
-    return this;
-  }
-
   private <T> Codec<T> resolve(Codec<T> explicit, Class<T> type, String role) {
     if (explicit != null) {
       return explicit;
@@ -102,7 +80,7 @@ final class DefaultRetryableClientConfig<R, C, D> implements RetryableClientConf
         kind,
         resolve(resultCodec, resultType, "result"),
         resolve(continuationCodec, continuationType, "continuation"),
-        new ClientSupport.ClientSettings(deadline, lease, backoff, workerId));
+        deadline);
   }
 
   Codec<D> resolveDispatchCodec(Class<D> dispatchType) {

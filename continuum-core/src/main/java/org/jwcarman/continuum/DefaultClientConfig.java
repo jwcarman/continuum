@@ -17,7 +17,6 @@ package org.jwcarman.continuum;
 
 import java.time.Duration;
 import java.util.Objects;
-import java.util.UUID;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
 
@@ -27,9 +26,6 @@ final class DefaultClientConfig<R, C> implements ClientConfig<R, C> {
   private Codec<R> resultCodec;
   private Codec<C> continuationCodec;
   private Duration deadline;
-  private Duration lease = Duration.ofSeconds(30);
-  private Duration backoff = Duration.ofSeconds(30);
-  private String workerId = "worker-" + UUID.randomUUID();
 
   @Override
   public ClientConfig<R, C> codecs(CodecFactory factory) {
@@ -55,24 +51,6 @@ final class DefaultClientConfig<R, C> implements ClientConfig<R, C> {
     return this;
   }
 
-  @Override
-  public ClientConfig<R, C> lease(Duration lease) {
-    this.lease = Objects.requireNonNull(lease, "lease must not be null");
-    return this;
-  }
-
-  @Override
-  public ClientConfig<R, C> backoff(Duration backoff) {
-    this.backoff = Objects.requireNonNull(backoff, "backoff must not be null");
-    return this;
-  }
-
-  @Override
-  public ClientConfig<R, C> workerId(String workerId) {
-    this.workerId = Objects.requireNonNull(workerId, "workerId must not be null");
-    return this;
-  }
-
   private <T> Codec<T> resolve(Codec<T> explicit, Class<T> type, String role) {
     if (explicit != null) {
       return explicit;
@@ -93,6 +71,6 @@ final class DefaultClientConfig<R, C> implements ClientConfig<R, C> {
         kind,
         resolve(resultCodec, resultType, "result"),
         resolve(continuationCodec, continuationType, "continuation"),
-        new ClientSupport.ClientSettings(deadline, lease, backoff, workerId));
+        deadline);
   }
 }
