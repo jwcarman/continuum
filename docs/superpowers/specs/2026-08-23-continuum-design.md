@@ -262,8 +262,18 @@ int pump(); // returns number successfully delivered
 ### TimeoutReaper
 
 ```java
-int pump(); // returns number of expired computations processed
+int pump(); // processes at most batchSize expired computations, returns the count
 ```
+
+Each pump handles one bounded batch (`batchSize` configurable, e.g. a dozen)
+and never loops internally — the caller owns cadence, and
+`while (reaper.pump() > 0)` drains a backlog when wanted. A full-batch return
+signals more work probably remains; a short batch means caught up. After an
+outage this paces redispatch naturally instead of thundering. On JDBC,
+`findExpired` uses `FOR UPDATE SKIP LOCKED` like outbox claiming so
+concurrent reapers mostly grab disjoint batches — an efficiency courtesy,
+not a correctness requirement (overlap yields a duplicate retry request,
+covered by at-least-once + `InvocationId` idempotency).
 
 The `RetryHandler` is a **required constructor argument** of the reaper (no
 global registry to forget; "no handler" is a compile error, not a runtime
