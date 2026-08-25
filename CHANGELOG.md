@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-25
+
 ### Added
 
 - **`continuum-jdbc` supports SQL Server 2012+, certified.** Full TCK,
@@ -19,7 +21,6 @@ All notable changes to this project will be documented in this file.
   orders by `completed_at` on every platform: SQL Server's `OFFSET/FETCH`
   requires an `ORDER BY`, and purging oldest-first is the right order anyway.
 
-
 - **`continuum-jdbc` supports Oracle 23ai+, certified.** Full TCK, concurrency
   suites included, on every build. Oracle brought the dialect seam its first
   genuine behavioral difference: a row-limited read cannot be locked (Oracle's
@@ -31,7 +32,6 @@ All notable changes to this project will be documented in this file.
   unpooled `OracleDataSource` opens a physical session per operation and the
   TCK's race loops exhaust Oracle Free's session cap.
 
-
 - **H2 2.3+ is certified for test/embedded use.** It passes the full TCK in
   both default and PostgreSQL-compatibility modes, and the reference PostgreSQL
   DDL now serves it verbatim (`TIMESTAMP(6) WITH TIME ZONE` is spelled out
@@ -40,7 +40,6 @@ All notable changes to this project will be documented in this file.
   JDBC provider — SQL, schema, dialect — without a container, which
   `continuum-memory` cannot offer since it bypasses SQL entirely. Not a
   production database; the certified list says so.
-
 
 - **`continuum-jdbc` now supports MySQL 8+ and MariaDB 10.6+, certified.** All
   three platforms — PostgreSQL 9.5+, MySQL 8.4, MariaDB 11.4 — pass the full TCK
@@ -66,7 +65,6 @@ All notable changes to this project will be documented in this file.
   judgment: genuine PostgreSQL 9.5+, MySQL 8+, and MariaDB 10.6+ are admitted;
   everything else is refused by name, wire-compatible impostors with their real
   engine version.
-
 
 - **`continuum-jdbc` now refuses databases that merely impersonate PostgreSQL.**
   CockroachDB and YugabyteDB report `PostgreSQL` through every metadata field a
@@ -94,6 +92,14 @@ All notable changes to this project will be documented in this file.
   run in a default build — runnable on demand via
   `mvn -pl continuum-jdbc verify -Dit.test=CockroachCertificationExperiment`.
 
+
+### Changed
+
+- `JdbcContinuumRepository` assembles the four dialect-dependent statements
+  exactly once, when the dialect resolves, rather than at each call site; the
+  string-keyed dialects share a `StringUuidDialect` base. No behavioral change.
+- Routine dependency and plugin bumps; test-scope drivers now certify on
+  H2 2.4, mysql-connector-j 26.7, mssql-jdbc 13.4, ojdbc11 23.26.
 
 ## [0.3.0] - 2026-08-24
 
@@ -214,6 +220,7 @@ means only "this row was written".
 See the [documentation](https://jwcarman.github.io/continuum/) for the full
 tour.
 
+[0.4.0]: https://github.com/jwcarman/continuum/releases/tag/0.4.0
 [0.3.0]: https://github.com/jwcarman/continuum/releases/tag/0.3.0
 [0.2.0]: https://github.com/jwcarman/continuum/releases/tag/0.2.0
 [0.1.0]: https://github.com/jwcarman/continuum/releases/tag/0.1.0
