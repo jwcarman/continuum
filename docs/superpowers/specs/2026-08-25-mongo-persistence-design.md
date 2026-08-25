@@ -33,7 +33,8 @@ shippable module.
 `org.jwcarman.continuum:continuum-mongo`. Dependencies: `continuum-core` and
 `mongodb-driver-sync` (compile). Test: `continuum-testing`, Testcontainers
 `mongodb`. Added to `continuum-bom` and, as an optional dependency, to
-`continuum-spring-boot-starter`, mirroring `continuum-jdbc`.
+`continuum-autoconfigure`, mirroring `continuum-jdbc` — the starter declares
+neither.
 
 ## Storage
 
@@ -133,6 +134,9 @@ message, anything that cannot meet the TCK:
 | standalone (`hello` has no `setName` and `msg` is not `isdbgrid`) | `MongoDB 8.2 standalone — continuum needs a replica set; a single node started with --replSet is enough` |
 | MongoDB < 5.0 | `MongoDB 4.4.29 — continuum needs 5.0+` |
 | Amazon DocumentDB, Azure Cosmos DB (Mongo API), FerretDB — identified from `buildInfo`/`hello` | `Amazon DocumentDB 5.0 (reports as MongoDB 5.0.0) — not certified; see the persistence guide` |
+
+Impostor-by-host checks run before the version floor, so a Cosmos instance
+reporting 4.2 is named as Cosmos, not as old MongoDB.
 
 The message ends with the `assumeMongoDb` escape hatch, the analogue of
 `assumePostgreSql`. The floor is 5.0 because transactions on sharded clusters,

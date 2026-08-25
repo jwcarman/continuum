@@ -48,6 +48,11 @@ class AutoConfigurationImportsTest {
       // H2 and spring-boot-jdbc are on the test classpath, so Boot's own
       // DataSourceAutoConfiguration also activates via discovery and our JDBC provider
       // must win over the memory fallback — proving imports AND ordering end to end.
+      // mongodb-driver-sync is also on this classpath, but deliberately no MongoClient bean
+      // exists here, so JDBC remains the single candidate. If Boot's own Mongo
+      // auto-configuration ever lands on this classpath and registers a MongoClient, set
+      // continuum.persistence.type=jdbc here rather than letting the resulting ambiguity
+      // failure masquerade as an imports problem.
       assertThat(context.getBean(ContinuumRepository.class))
           .isInstanceOf(JdbcContinuumRepository.class);
       assertThat(context.getBean(Continuum.class)).isNotNull();

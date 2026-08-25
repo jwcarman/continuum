@@ -84,12 +84,15 @@ import org.jwcarman.continuum.spi.StoredContinuation;
  * MongoDB persistence over a plain {@link MongoClient}, certified on MongoDB 5.0+ replica sets —
  * the full TCK battery, concurrency suites included, on every build.
  *
- * <p>Four collections mirror the JDBC tables. Every operation that touches more than one document
- * runs in a transaction, which is why a replica set is required: standalone servers have no
- * multi-document transactions, and the ownership transfer in {@link #complete} must be atomic or a
- * crash between the delete and the outbox insert loses deliveries silently. The outbox claim needs
- * no locking clause at all — each claim is a single-document compare-and-set on {@code
- * claimedUntil}, so competing claimers never block and never double-claim.
+ * <p>Four collections mirror the JDBC tables. Every mutating operation that touches more than one
+ * document — {@link #createComputation}, {@link #registerContinuation}, {@link #complete} — runs in
+ * a transaction, which is why a replica set is required: standalone servers have no multi-document
+ * transactions, and the ownership transfer in {@link #complete} must be atomic or a crash between
+ * the delete and the outbox insert loses deliveries silently. {@link #purgeResults} touches more
+ * than one document too, but needs no transaction: it reads ids then deletes by id, and {@code
+ * deleteMany} reports the actual count either way. The outbox claim needs no locking clause at all
+ * — each claim is a single-document compare-and-set on {@code claimedUntil}, so competing claimers
+ * never block and never double-claim.
  *
  * <p>Instants are stored as BSON {@code date}, millisecond precision. Identities are canonical UUID
  * strings, so UUIDv7 time-ordering survives.

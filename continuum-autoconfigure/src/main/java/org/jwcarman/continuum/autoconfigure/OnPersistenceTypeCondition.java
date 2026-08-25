@@ -18,6 +18,7 @@ package org.jwcarman.continuum.autoconfigure;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.jwcarman.continuum.spi.ContinuumRepository;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionMessage;
 import org.springframework.boot.autoconfigure.condition.ConditionOutcome;
@@ -30,13 +31,18 @@ import org.springframework.util.ClassUtils;
 
 /**
  * The selection rule, in the shape of Spring Session's {@code store-type}: an explicit property
- * wins; otherwise the single candidate wins; two candidates fail startup naming the property.
+ * wins; otherwise the single candidate wins; two candidates fail startup naming the property; and a
+ * user-defined {@link ContinuumRepository} bean always wins over auto-detection.
  *
  * <p>Evaluated in the {@link ConfigurationCondition.ConfigurationPhase#REGISTER_BEAN} phase — the
  * same phase {@code @ConditionalOnBean} uses — because the candidate check inspects the bean
  * factory for a {@code DataSource} or {@code MongoClient} bean, and those are not yet registered
  * during the earlier {@code PARSE_CONFIGURATION} phase that {@link SpringBootCondition} defaults
  * to.
+ *
+ * <p>Because auto-configuration ordering does not relate the JDBC configuration to Boot's Mongo
+ * one, the ambiguity between two candidates may be reported from either provider's
+ * {@code @ConditionalOnPersistenceType} evaluation — the message is the same either way.
  */
 final class OnPersistenceTypeCondition extends SpringBootCondition
     implements ConfigurationCondition {
@@ -71,9 +77,27 @@ final class OnPersistenceTypeCondition extends SpringBootCondition
                     .getAnnotationAttributes(ConditionalOnPersistenceType.class.getName())
                     .get("value")));
     ConditionMessage.Builder message = ConditionMessage.forCondition("ContinuumPersistence");
+    if (context.getBeanFactory() != null
+        && context
+                .getBeanFactory()
+                .getBeanNamesForType(ContinuumRepository.class, true, false)
+                .length
+            > 0) {
+      return ConditionOutcome.noMatch(
+          message.because("a ContinuumRepository bean is already defined"));
+    }
     String configured = context.getEnvironment().getProperty(PROPERTY);
     if (configured != null) {
-      PersistenceType selected = PersistenceType.valueOf(configured.toUpperCase(Locale.ROOT));
+      PersistenceType selected;
+      try {
+        selected = PersistenceType.valueOf(configured.toUpperCase(Locale.ROOT));
+      } catch (IllegalArgumentException e) {
+        // Deliberately no cause: AssertJ's rootCause() (and Boot's own failure-analysis
+        // reporting) walks to the deepest throwable, and the raw enum-lookup exception names
+        // neither the property nor the valid choices — only this message does.
+        throw new IllegalStateException(
+            "Unknown " + PROPERTY + " '" + configured + "'; expected one of jdbc, mongo, memory.");
+      }
       return selected == wanted
           ? ConditionOutcome.match(message.because(PROPERTY + "=" + configured))
           : ConditionOutcome.noMatch(message.because(PROPERTY + "=" + configured));

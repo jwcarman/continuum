@@ -84,8 +84,33 @@ class MongoContinuumAutoConfigurationTest {
     }
   }
 
+  @Configuration(proxyBeanMethods = false)
+  static class UserRepositoryConfiguration {
+    static final InMemoryContinuumRepository INSTANCE = new InMemoryContinuumRepository();
+
+    @Bean
+    ContinuumRepository continuumRepository() {
+      return INSTANCE;
+    }
+  }
+
   @Nested
   class Auto_detection {
+    @Test
+    void a_user_defined_repository_bean_always_wins() {
+      runner
+          .withUserConfiguration(
+              DataSourceConfiguration.class,
+              MongoClientConfiguration.class,
+              UserRepositoryConfiguration.class)
+          .run(
+              context -> {
+                assertThat(context).hasNotFailed();
+                assertThat(context.getBean(ContinuumRepository.class))
+                    .isSameAs(UserRepositoryConfiguration.INSTANCE);
+              });
+    }
+
     @Test
     void uses_mongo_when_continuum_mongo_and_a_mongo_client_are_present() {
       runner
@@ -166,6 +191,22 @@ class MongoContinuumAutoConfigurationTest {
               context ->
                   assertThat(context.getBean(ContinuumRepository.class))
                       .isInstanceOf(InMemoryContinuumRepository.class));
+    }
+
+    @Test
+    void an_unknown_type_fails_startup_naming_the_property_and_the_choices() {
+      runner
+          .withUserConfiguration(MongoClientConfiguration.class)
+          .withPropertyValues("continuum.persistence.type=mongodb")
+          .run(
+              context -> {
+                assertThat(context).hasFailed();
+                assertThat(context.getStartupFailure())
+                    .rootCause()
+                    .hasMessageContaining("continuum.persistence.type")
+                    .hasMessageContaining("mongodb")
+                    .hasMessageContaining("jdbc, mongo, memory");
+              });
     }
   }
 

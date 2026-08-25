@@ -27,7 +27,7 @@
     </parent>
     <artifactId>continuum-spring-boot-starter</artifactId>
     <name>Continuum Spring Boot Starter</name>
-    <description>Spring Boot starter for Continuum — add continuum-jdbc and a DataSource for durability</description>
+    <description>Spring Boot starter for Continuum — add continuum-jdbc and a DataSource, or continuum-mongo and a MongoClient, for durability</description>
     <dependencies>
         <dependency>
             <groupId>org.jwcarman.continuum</groupId>

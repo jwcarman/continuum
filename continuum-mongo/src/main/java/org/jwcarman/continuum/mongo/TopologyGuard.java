@@ -57,7 +57,15 @@ final class TopologyGuard {
         throw refuse("Azure Cosmos DB (reports as MongoDB " + version + ")");
       }
     }
-    if (major(version) < MINIMUM_MAJOR) {
+    Integer majorVersion = major(version);
+    if (majorVersion == null) {
+      throw new ContinuumPersistenceException(
+          "unsupported database platform: unrecognized MongoDB version "
+              + version
+              + "."
+              + ESCAPE_HATCH);
+    }
+    if (majorVersion < MINIMUM_MAJOR) {
       throw new ContinuumPersistenceException(
           "unsupported database platform: MongoDB "
               + version
@@ -97,9 +105,17 @@ final class TopologyGuard {
     return hosts;
   }
 
-  private static int major(String version) {
+  private static Integer major(String version) {
+    if (version == null) {
+      return null;
+    }
     int dot = version.indexOf('.');
-    return Integer.parseInt(dot < 0 ? version : version.substring(0, dot));
+    String leading = dot < 0 ? version : version.substring(0, dot);
+    try {
+      return Integer.parseInt(leading);
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   private static String hostname(String hostAndPort) {

@@ -193,6 +193,30 @@ class TopologyGuardTest {
     }
 
     @Test
+    void a_missing_version_is_refused_as_unrecognized() {
+      var noVersion = new Document("ok", 1.0);
+      var repository =
+          new MongoContinuumRepository(server(noVersion, replicaSet("localhost:27017")), "app");
+
+      assertThatExceptionOfType(ContinuumPersistenceException.class)
+          .isThrownBy(() -> anyOperation(repository))
+          .withMessageContaining("unrecognized MongoDB version")
+          .withMessageContaining("assumeMongoDb");
+    }
+
+    @Test
+    void a_non_numeric_version_is_refused_as_unrecognized() {
+      var repository =
+          new MongoContinuumRepository(
+              server(buildInfo("unknown"), replicaSet("localhost:27017")), "app");
+
+      assertThatExceptionOfType(ContinuumPersistenceException.class)
+          .isThrownBy(() -> anyOperation(repository))
+          .withMessageContaining("unrecognized MongoDB version")
+          .withMessageContaining("unknown");
+    }
+
+    @Test
     void ferretdb_is_refused_by_name() {
       var buildInfo = buildInfo("7.0.42").append("ferretdb", new Document("version", "v2.1.0"));
       var repository =
