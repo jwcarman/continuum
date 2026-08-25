@@ -245,6 +245,16 @@ all exist there.
 
 ### Phase 3 — MySQL / MariaDB (first real dialect work)
 
+> **OUTCOME (2026-08-25): all three suites certified — MySQL 8.4, MariaDB 11.4
+> native, and MariaDB via mysql-connector-j. 104 TCK tests green across four
+> platforms including PostgreSQL.** The concurrency heart passed on the first
+> real attempt; the only failures en route were one comment-shearing bug in the
+> test schema helper and one genuinely non-portable statement — the purge's
+> `IN (SELECT ... LIMIT ?)`, rewritten as a derived table both families accept.
+> The dialect seam ended up smaller than planned: UUID binding plus a DDL
+> resource pointer, zero SQL methods.
+
+
 First genuine type mapping: `continuum-mysql.sql` reference DDL (`BINARY(16)`
 or `CHAR(36)` for UUID, `LONGBLOB`, `TIMESTAMP(6)`), a second
 `ContinuumDialect`, TCK against both images and both drivers — the

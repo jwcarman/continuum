@@ -6,6 +6,32 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **`continuum-jdbc` now supports MySQL 8+ and MariaDB 10.6+, certified.** All
+  three platforms — PostgreSQL 9.5+, MySQL 8.4, MariaDB 11.4 — pass the full TCK
+  battery, concurrency suites included, and MariaDB is certified through both
+  its own driver and mysql-connector-j (the pairing that reports `MySQL` and
+  betrays the real engine only in the version string — detection disambiguates
+  it). The certification suites run as ordinary integration tests, so every
+  build re-certifies all three.
+
+  What actually varies between platforms turned out to be almost nothing: one
+  JDBC-layer fact (PostgreSQL binds native `uuid`, MySQL/MariaDB bind
+  `CHAR(36)` strings — UUIDv7's canonical text sorts identically to its byte
+  order, so time-ordered index locality survives), the type names in a new
+  `continuum-mysql.sql` reference DDL (`DATETIME(6)` rather than `TIMESTAMP`,
+  which ends at 2038), and one purge statement rewritten into a derived-table
+  form both platform families accept. The `ContinuumDialect` seam carries
+  exactly that and nothing else, and
+  `JdbcContinuumRepository.withDialect(dataSource, dialect)` is the extension
+  point for a platform certified outside this project. `assumePostgreSql`
+  remains for operators bypassing detection.
+
+  Platform detection now selects the dialect rather than merely passing
+  judgment: genuine PostgreSQL 9.5+, MySQL 8+, and MariaDB 10.6+ are admitted;
+  everything else is refused by name, wire-compatible impostors with their real
+  engine version.
+
+
 - **`continuum-jdbc` now refuses databases that merely impersonate PostgreSQL.**
   CockroachDB and YugabyteDB report `PostgreSQL` through every metadata field a
   driver exposes and *accept* `FOR UPDATE SKIP LOCKED`, so pointing the

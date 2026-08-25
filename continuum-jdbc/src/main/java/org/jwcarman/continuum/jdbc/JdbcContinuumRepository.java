@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 import javax.sql.DataSource;
 import org.jwcarman.accent.Accent;
 import org.jwcarman.accent.AccentException;
@@ -48,10 +47,11 @@ import org.jwcarman.continuum.spi.RegistrationOutcome;
 import org.jwcarman.continuum.spi.StoredContinuation;
 
 /**
- * PostgreSQL persistence over a plain {@link DataSource}. Completion is a single-transaction
- * ownership transfer; outbox claiming uses {@code FOR UPDATE SKIP LOCKED} so competing consumers
- * never block. Schema is application-owned — see the classpath resource {@code
- * continuum-postgresql.sql}.
+ * JDBC persistence over a plain {@link DataSource}, certified on PostgreSQL 9.5+, MySQL 8+ and
+ * MariaDB 10.6+ — each of which has passed the full TCK battery, concurrency suites included.
+ * Completion is a single-transaction ownership transfer; outbox claiming uses {@code FOR UPDATE
+ * SKIP LOCKED} so competing consumers never block. Schema is application-owned — see the classpath
+ * resources {@code continuum-postgresql.sql} and {@code continuum-mysql.sql}.
  */
 public final class JdbcContinuumRepository implements ContinuumRepository {
 
@@ -72,8 +72,9 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
   private static final String ATTEMPT_COUNT_COLUMN = "attempt_count";
 
   private final DataSource dataSource;
-  private final boolean verifyPlatform;
-  private volatile boolean platformVerified;
+  // null means "detect on first use"; a preset dialect (escape hatches, withDialect) skips
+  // detection entirely. Volatile with a benign race: concurrent first uses resolve identically.
+  private volatile ContinuumDialect dialect;
 
   /**
    * Binds this repository to a data source. No schema is created or validated here — run {@code
@@ -88,15 +89,16 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
    * on go unverified. Detection is one {@code SELECT version()} round trip, once per repository
    * instance.
    *
-   * @param dataSource the PostgreSQL data source; the application owns pooling and schema
+   * @param dataSource a data source for a certified platform; the application owns pooling and
+   *     schema
    */
   public JdbcContinuumRepository(DataSource dataSource) {
-    this(dataSource, true);
+    this(dataSource, null);
   }
 
-  private JdbcContinuumRepository(DataSource dataSource, boolean verifyPlatform) {
+  private JdbcContinuumRepository(DataSource dataSource, ContinuumDialect preset) {
     this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
-    this.verifyPlatform = verifyPlatform;
+    this.dialect = preset;
   }
 
   /**
@@ -108,7 +110,27 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
    * @return a repository that will never run detection
    */
   public static JdbcContinuumRepository assumePostgreSql(DataSource dataSource) {
-    return new JdbcContinuumRepository(dataSource, false);
+    return new JdbcContinuumRepository(dataSource, ContinuumDialect.POSTGRESQL);
+  }
+
+  /**
+   * Binds this repository to a data source with an explicit dialect, skipping detection — the
+   * extension point for a platform certified outside this project. Run the TCK against it first; a
+   * dialect that binds correctly on a platform whose locking semantics break the contract is
+   * exactly the silent failure the certified list exists to prevent.
+   *
+   * @param dataSource the data source
+   * @param dialect the dialect to use, unconditionally
+   * @return a repository that will never run detection
+   */
+  public static JdbcContinuumRepository withDialect(
+      DataSource dataSource, ContinuumDialect dialect) {
+    return new JdbcContinuumRepository(
+        dataSource, Objects.requireNonNull(dialect, "dialect must not be null"));
+  }
+
+  private ContinuumDialect dialect() {
+    return dialect;
   }
 
   @FunctionalInterface
@@ -119,29 +141,35 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
   private <T> T inTransaction(SqlWork<T> work) {
     try (Connection connection = dataSource.getConnection()) {
       connection.setAutoCommit(false);
-      verifyPlatform(connection);
+      if (dialect == null) {
+        resolveDialect(connection);
+      }
       return commitOrRollback(work, connection);
     } catch (SQLException e) {
       throw new ContinuumPersistenceException("database operation failed", e);
     }
   }
 
-  private void verifyPlatform(Connection connection) {
-    if (!verifyPlatform || platformVerified) {
-      return;
-    }
+  private void resolveDialect(Connection connection) {
     Platform platform;
     try {
       platform = Accent.of(connection);
     } catch (AccentException e) {
       throw new ContinuumPersistenceException("database platform detection failed", e);
     }
-    if (platform instanceof Platform.PostgreSQL postgres && postgres.supportsSkipLocked()) {
-      // Benign race: concurrent first uses may each verify; every path is idempotent.
-      platformVerified = true;
-      return;
-    }
-    throw new ContinuumPersistenceException(refusal(platform));
+    // Identity first, capability second — the conjunction matters. CockroachDB and YugabyteDB
+    // report supportsSkipLocked() = true and still failed TCK certification (see
+    // persistence.md), so a capability-only gate would admit exactly the platforms the
+    // certified list exists to refuse.
+    ContinuumDialect resolved =
+        switch (platform) {
+          case Platform.PostgreSQL postgres when postgres.supportsSkipLocked() ->
+              ContinuumDialect.POSTGRESQL;
+          case Platform.MySQL mysql when mysql.supportsSkipLocked() -> ContinuumDialect.MYSQL;
+          case Platform.MariaDB mariadb when mariadb.supportsSkipLocked() -> ContinuumDialect.MYSQL;
+          default -> throw new ContinuumPersistenceException(refusal(platform));
+        };
+    dialect = resolved;
   }
 
   // Not an exhaustive switch on purpose: accent's Platform is sealed, and a new arm added there
@@ -155,6 +183,10 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                   + "."
                   + postgres.minorVersion()
                   + ", which lacks FOR UPDATE SKIP LOCKED";
+          case Platform.MySQL mysql ->
+              "MySQL " + mysql.productVersion() + ", which lacks FOR UPDATE SKIP LOCKED";
+          case Platform.MariaDB mariadb ->
+              "MariaDB " + mariadb.productVersion() + ", which lacks FOR UPDATE SKIP LOCKED";
           case Platform.CockroachDB cockroach ->
               "CockroachDB "
                   + cockroach.engine().raw()
@@ -171,9 +203,10 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
         };
     return "unsupported database platform: "
         + detected
-        + "; continuum-jdbc is certified on PostgreSQL 9.5+."
-        + " If you are certain this database behaves as PostgreSQL, construct via"
-        + " JdbcContinuumRepository.assumePostgreSql(dataSource) to bypass detection.";
+        + "; certified platforms: PostgreSQL 9.5+, MySQL 8+, MariaDB 10.6+."
+        + " To use an uncertified platform anyway, construct via"
+        + " JdbcContinuumRepository.withDialect(dataSource, dialect) — after running the TCK"
+        + " against it.";
   }
 
   private static <T> T commitOrRollback(SqlWork<T> work, Connection connection)
@@ -205,7 +238,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
             "INSERT INTO continuum_computation "
                 + "(id, kind, deadline_at, dispatch_payload, attempt_count, submitted_at, last_updated_at) "
                 + "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
-      insert.setObject(1, computation.id().value());
+      dialect().setUuid(insert, 1, computation.id().value());
       insert.setString(2, computation.kind().value());
       insert.setTimestamp(3, Timestamp.from(computation.deadline()));
       insert.setBytes(4, computation.dispatchPayload());
@@ -226,8 +259,8 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
         connection.prepareStatement(
             "INSERT INTO continuum_continuation (id, computation_id, payload, created_at) "
                 + "VALUES (?, ?, ?, ?)")) {
-      insert.setObject(1, continuation.id().value());
-      insert.setObject(2, computationId.value());
+      dialect().setUuid(insert, 1, continuation.id().value());
+      dialect().setUuid(insert, 2, computationId.value());
       insert.setBytes(3, continuation.payload());
       insert.setTimestamp(4, Timestamp.from(submittedAt));
       insert.executeUpdate();
@@ -266,7 +299,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                       + "(computation_id, kind, outcome_type, outcome_payload, expiry_kind, message, "
                       + " deadline_at, attempt_count, submitted_at, completed_at) "
                       + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
-            insert.setObject(1, id.value());
+            dialect().setUuid(insert, 1, id.value());
             insert.setString(2, pending.kind().value());
             setOutcomeColumns(insert, 3, outcome);
             insert.setTimestamp(7, Timestamp.from(pending.deadline()));
@@ -283,7 +316,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                       + " attempt_count, created_at, submitted_at, "
                       + " completed_at) "
                       + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)")) {
-            insert.setObject(2, id.value());
+            dialect().setUuid(insert, 2, id.value());
             insert.setString(4, pending.kind().value());
             setOutcomeColumns(insert, 6, outcome);
             insert.setTimestamp(10, Timestamp.from(completedAt));
@@ -291,8 +324,8 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
             insert.setTimestamp(12, Timestamp.from(pending.submittedAt()));
             insert.setTimestamp(13, Timestamp.from(completedAt));
             for (StoredContinuation continuation : readContinuations(connection, id)) {
-              insert.setObject(1, DeliveryId.random().value());
-              insert.setObject(3, continuation.id().value());
+              dialect().setUuid(insert, 1, DeliveryId.random().value());
+              dialect().setUuid(insert, 3, continuation.id().value());
               insert.setBytes(5, continuation.payload());
               insert.addBatch();
             }
@@ -308,7 +341,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
   private void executeUpdate(Connection connection, String sql, ComputationId id)
       throws SQLException {
     try (PreparedStatement statement = connection.prepareStatement(sql)) {
-      statement.setObject(1, id.value());
+      dialect().setUuid(statement, 1, id.value());
       statement.executeUpdate();
     }
   }
@@ -319,7 +352,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
         connection.prepareStatement(
             "SELECT kind, deadline_at, dispatch_payload, attempt_count, submitted_at "
                 + "FROM continuum_computation WHERE id = ? FOR UPDATE")) {
-      select.setObject(1, id.value());
+      dialect().setUuid(select, 1, id.value());
       try (ResultSet row = select.executeQuery()) {
         if (!row.next()) {
           return null;
@@ -348,12 +381,12 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
     try (PreparedStatement select =
         connection.prepareStatement(
             "SELECT id, payload FROM continuum_continuation WHERE computation_id = ?")) {
-      select.setObject(1, id.value());
+      dialect().setUuid(select, 1, id.value());
       try (ResultSet row = select.executeQuery()) {
         while (row.next()) {
           continuations.add(
               new StoredContinuation(
-                  new ContinuationId(row.getObject(ID_COLUMN, UUID.class)),
+                  new ContinuationId(dialect().getUuid(row, ID_COLUMN)),
                   row.getBytes(PAYLOAD_COLUMN)));
         }
       }
@@ -367,7 +400,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
         connection.prepareStatement(
             "SELECT outcome_type, outcome_payload, expiry_kind, message "
                 + "FROM continuum_result WHERE computation_id = ?")) {
-      select.setObject(1, id.value());
+      dialect().setUuid(select, 1, id.value());
       try (ResultSet row = select.executeQuery()) {
         if (!row.next()) {
           return Optional.empty();
@@ -420,7 +453,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
               connection.prepareStatement(
                   "SELECT kind, deadline_at, dispatch_payload, attempt_count, submitted_at "
                       + "FROM continuum_computation WHERE id = ?")) {
-            select.setObject(1, id.value());
+            dialect().setUuid(select, 1, id.value());
             try (ResultSet row = select.executeQuery()) {
               if (row.next()) {
                 return Optional.of(pendingComputation(id, row));
@@ -432,7 +465,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                   "SELECT kind, outcome_type, outcome_payload, expiry_kind, message, "
                       + " deadline_at, attempt_count, submitted_at "
                       + "FROM continuum_result WHERE computation_id = ?")) {
-            select.setObject(1, id.value());
+            dialect().setUuid(select, 1, id.value());
             try (ResultSet row = select.executeQuery()) {
               if (!row.next()) {
                 return Optional.empty();
@@ -476,11 +509,11 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
               while (row.next()) {
                 claimed.add(
                     new ClaimedDelivery(
-                        new DeliveryId(row.getObject(ID_COLUMN, UUID.class)),
+                        new DeliveryId(dialect().getUuid(row, ID_COLUMN)),
                         new CompletionDelivery(
-                            new ComputationId(row.getObject(COMPUTATION_ID_COLUMN, UUID.class)),
+                            new ComputationId(dialect().getUuid(row, COMPUTATION_ID_COLUMN)),
                             kind,
-                            new ContinuationId(row.getObject(CONTINUATION_ID_COLUMN, UUID.class)),
+                            new ContinuationId(dialect().getUuid(row, CONTINUATION_ID_COLUMN)),
                             row.getBytes(CONTINUATION_PAYLOAD_COLUMN),
                             readOutcome(row),
                             row.getTimestamp(SUBMITTED_AT_COLUMN).toInstant(),
@@ -495,7 +528,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
             update.setString(1, workerId);
             update.setTimestamp(2, Timestamp.from(now.plus(lease)));
             for (ClaimedDelivery delivery : claimed) {
-              update.setObject(3, delivery.id().value());
+              dialect().setUuid(update, 3, delivery.id().value());
               update.addBatch();
             }
             update.executeBatch();
@@ -510,7 +543,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
         connection -> {
           try (PreparedStatement delete =
               connection.prepareStatement("DELETE FROM continuum_outbox WHERE id = ?")) {
-            delete.setObject(1, id.value());
+            dialect().setUuid(delete, 1, id.value());
             delete.executeUpdate();
           }
           return null;
@@ -526,7 +559,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                   "UPDATE continuum_outbox SET claimed_by = NULL, claimed_until = NULL, "
                       + " available_at = ?, attempt_count = attempt_count + 1 WHERE id = ?")) {
             update.setTimestamp(1, Timestamp.from(retryAt));
-            update.setObject(2, id.value());
+            dialect().setUuid(update, 2, id.value());
             update.executeUpdate();
           }
           return null;
@@ -549,8 +582,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
             try (ResultSet row = select.executeQuery()) {
               while (row.next()) {
                 expired.add(
-                    pendingComputation(
-                        new ComputationId(row.getObject(ID_COLUMN, UUID.class)), row));
+                    pendingComputation(new ComputationId(dialect().getUuid(row, ID_COLUMN)), row));
               }
             }
           }
@@ -568,7 +600,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                       + " last_updated_at = CURRENT_TIMESTAMP WHERE id = ?")) {
             update.setTimestamp(1, Timestamp.from(newDeadline));
             update.setInt(2, attemptCount);
-            update.setObject(3, id.value());
+            dialect().setUuid(update, 3, id.value());
             update.executeUpdate();
           }
           return null;
@@ -581,9 +613,14 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
         connection -> {
           try (PreparedStatement delete =
               connection.prepareStatement(
+                  // The derived table is not decoration: MySQL and MariaDB reject LIMIT
+                  // directly inside an IN subquery, and separately refuse to delete from a
+                  // table being selected in the same statement — wrapping the subquery in a
+                  // derived table sidesteps both, and PostgreSQL accepts the same text.
                   "DELETE FROM continuum_result WHERE computation_id IN ("
+                      + "SELECT computation_id FROM ("
                       + "SELECT computation_id FROM continuum_result "
-                      + "WHERE kind = ? AND completed_at < ? LIMIT ?)")) {
+                      + "WHERE kind = ? AND completed_at < ? LIMIT ?) purgeable)")) {
             delete.setString(1, kind.value());
             delete.setTimestamp(2, Timestamp.from(olderThan));
             delete.setInt(3, limit);

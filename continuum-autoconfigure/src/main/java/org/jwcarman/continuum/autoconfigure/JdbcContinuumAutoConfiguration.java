@@ -25,8 +25,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 
 /**
- * Configures durable PostgreSQL persistence when {@code continuum-jdbc} is on the classpath and the
- * application defines a {@link DataSource}.
+ * Configures durable JDBC persistence (certified: PostgreSQL, MySQL, MariaDB) when {@code
+ * continuum-jdbc} is on the classpath and the application defines a {@link DataSource}.
  */
 @AutoConfiguration(
     before = ContinuumAutoConfiguration.class,
@@ -47,8 +47,8 @@ public class JdbcContinuumAutoConfiguration {
   }
 
   /**
-   * Contributes durable PostgreSQL persistence over the application's {@link DataSource}, unless a
-   * {@link ContinuumRepository} is already defined. Because this class is ordered before {@link
+   * Contributes durable JDBC persistence over the application's {@link DataSource}, unless a {@link
+   * ContinuumRepository} is already defined. Because this class is ordered before {@link
    * ContinuumAutoConfiguration}, winning here is what suppresses the in-memory fallback.
    *
    * @param dataSource the application's data source; it owns pooling and schema

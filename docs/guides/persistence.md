@@ -1,14 +1,23 @@
 # Persistence Providers
 
-## PostgreSQL (`continuum-jdbc`)
+## JDBC (`continuum-jdbc`)
 
 `JdbcContinuumRepository` runs over a plain `DataSource` — no Spring, no pool
-opinions, driver scope `provided` (your app supplies it). It is deliberately
-PostgreSQL-flavored: claiming uses `FOR UPDATE SKIP LOCKED` so competing
-consumers never block one another, and the schema uses `UUID`, `TIMESTAMPTZ`,
-and `BYTEA`. A lowest-common-denominator ANSI provider would forfeit exactly
-the concurrency properties the outbox depends on; other databases deserve
-their own providers certified against the TCK.
+opinions, driver scope `provided` (your app supplies it). Claiming uses
+`FOR UPDATE SKIP LOCKED` so competing consumers never block one another; a
+lowest-common-denominator ANSI provider would forfeit exactly the concurrency
+properties the outbox depends on, so support means certification, not syntax.
+
+| Platform | Status | Reference DDL |
+|---|---|---|
+| PostgreSQL 9.5+ | **Certified** — full TCK, every release | `continuum-postgresql.sql` |
+| MySQL 8+ | **Certified** — full TCK, every release | `continuum-mysql.sql` |
+| MariaDB 10.6+ | **Certified** — full TCK, both drivers (its own and mysql-connector-j) | `continuum-mysql.sql` |
+| CockroachDB | **Refused** — failed certification, twice silently | — |
+| YugabyteDB | **Refused** — failed certification loudly; a retry layer could revisit | — |
+
+The provider detects the actual platform on first use and selects the matching
+dialect; everything below the certified rows is refused by name.
 
 !!! warning "PostgreSQL means PostgreSQL"
     Wire-compatible databases — CockroachDB, YugabyteDB — report `PostgreSQL`
@@ -65,7 +74,7 @@ and `continuum_outbox` (active delivery obligations only).
 ## In-memory (`continuum-memory`)
 
 `InMemoryContinuumRepository` is a faithful implementation, not a mock — it
-passes the same TCK as the PostgreSQL provider, including the concurrency
+passes the same TCK as the JDBC provider, including the concurrency
 battery. Single JVM, no durability across restarts: right for unit tests and
 embedded/single-process use.
 

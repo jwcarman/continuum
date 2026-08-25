@@ -52,7 +52,8 @@ class YugabyteCertificationExperiment extends ContinuumTck {
             + YUGABYTE.getDatabaseName());
     dataSource.setUser(YUGABYTE.getUsername());
     dataSource.setPassword(YUGABYTE.getPassword());
-    TckSchema.applyAndTruncate(dataSource);
+    TckSchema.applySchema(dataSource, ContinuumDialect.POSTGRESQL);
+    TckSchema.truncate(dataSource);
     return JdbcContinuumRepository.assumePostgreSql(dataSource);
   }
 }

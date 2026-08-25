@@ -24,26 +24,49 @@ import java.sql.Statement;
 import javax.sql.DataSource;
 
 /**
- * Applies the reference PostgreSQL schema and empties every table — shared by the Postgres TCK run
- * and the wire-compatible certification runs (CockroachDB, YugabyteDB), which deliberately use the
- * <em>unmodified</em> Postgres DDL: whether it works there unchanged is part of what those runs
- * measure.
+ * Schema lifecycle for the certification suites, portable across every dialect under test.
+ *
+ * <p>Three MySQL facts shape this class, none of which PostgreSQL forced on the earlier version:
+ * the driver will not execute a multi-statement script in one {@code execute}, so the DDL is split
+ * and run statement by statement; {@code CREATE INDEX} has no {@code IF NOT EXISTS}, so the schema
+ * is applied once per container (from each suite's static initializer) rather than per test; and
+ * {@code TRUNCATE} refuses any table referenced by a foreign key, so per-test cleanup is ordered
+ * {@code DELETE}s — child before parent — which every platform accepts.
  */
 final class TckSchema {
 
   private TckSchema() {}
 
-  static void applyAndTruncate(DataSource dataSource) {
+  /** Applies the dialect's reference DDL. Call once per container, not per test. */
+  static void applySchema(DataSource dataSource, ContinuumDialect dialect) {
     try (Connection connection = dataSource.getConnection();
         Statement statement = connection.createStatement();
-        InputStream schema =
-            TckSchema.class.getResourceAsStream(
-                "/org/jwcarman/continuum/jdbc/continuum-postgresql.sql")) {
-      statement.execute(new String(schema.readAllBytes(), StandardCharsets.UTF_8));
-      statement.execute(
-          "TRUNCATE continuum_outbox, continuum_result, continuum_continuation, continuum_computation");
+        InputStream schema = TckSchema.class.getResourceAsStream(dialect.schemaResource())) {
+      String ddl = new String(schema.readAllBytes(), StandardCharsets.UTF_8);
+      // Strip line comments BEFORE splitting on semicolons: a semicolon inside a comment would
+      // otherwise shear the comment into a fragment that gets executed as a "statement".
+      String uncommented = ddl.replaceAll("--[^\n]*", "");
+      for (String sql : uncommented.split(";")) {
+        String trimmed = sql.trim();
+        if (!trimmed.isEmpty()) {
+          statement.execute(trimmed);
+        }
+      }
     } catch (SQLException | IOException e) {
-      throw new IllegalStateException("failed to prepare schema", e);
+      throw new IllegalStateException("failed to apply schema", e);
+    }
+  }
+
+  /** Empties every table, child before parent. Call before each test. */
+  static void truncate(DataSource dataSource) {
+    try (Connection connection = dataSource.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.execute("DELETE FROM continuum_outbox");
+      statement.execute("DELETE FROM continuum_result");
+      statement.execute("DELETE FROM continuum_continuation");
+      statement.execute("DELETE FROM continuum_computation");
+    } catch (SQLException e) {
+      throw new IllegalStateException("failed to truncate schema", e);
     }
   }
 }

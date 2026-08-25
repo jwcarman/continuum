@@ -106,6 +106,31 @@ class PlatformGuardTest {
     }
 
     @Test
+    void mysql_8_passes() throws SQLException {
+      var repository = new JdbcContinuumRepository(database("MySQL", "8.4.11", 8, 4, "unused"));
+      assertThatCode(() -> anyOperation(repository)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void mariadb_via_its_own_driver_passes() throws SQLException {
+      var repository =
+          new JdbcContinuumRepository(
+              database("MariaDB", "11.4.12-MariaDB-ubu2404", 11, 4, "unused"));
+      assertThatCode(() -> anyOperation(repository)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void mariadb_reached_through_mysql_connector_is_recognised_and_passes() throws SQLException {
+      // Measured: mysql-connector-j against a MariaDB server reports productName MySQL; only the
+      // version string names the real engine. accent disambiguates to the MariaDB arm, whose
+      // 10.6+ skip-locked floor 11.4 clears.
+      var repository =
+          new JdbcContinuumRepository(
+              database("MySQL", "11.4.12-MariaDB-ubu2404", 11, 4, "unused"));
+      assertThatCode(() -> anyOperation(repository)).doesNotThrowAnyException();
+    }
+
+    @Test
     void detection_runs_once_not_per_operation() throws SQLException {
       var dataSource =
           database("PostgreSQL", "17.10", 17, 10, "PostgreSQL 17.10 on aarch64-unknown-linux-gnu");
@@ -139,7 +164,7 @@ class PlatformGuardTest {
           .withMessageContaining("CockroachDB")
           .withMessageContaining("v24.1.0")
           .withMessageContaining("reports as PostgreSQL")
-          .withMessageContaining("assumePostgreSql");
+          .withMessageContaining("withDialect");
     }
 
     @Test
@@ -155,6 +180,16 @@ class PlatformGuardTest {
     }
 
     @Test
+    void mysql_5_7_is_refused_for_lacking_skip_locked() throws SQLException {
+      var repository = new JdbcContinuumRepository(database("MySQL", "5.7.44", 5, 7, "unused"));
+
+      assertThatExceptionOfType(ContinuumPersistenceException.class)
+          .isThrownBy(() -> anyOperation(repository))
+          .withMessageContaining("MySQL 5.7")
+          .withMessageContaining("SKIP LOCKED");
+    }
+
+    @Test
     void an_unrelated_database_is_refused_by_name() throws SQLException {
       var repository =
           new JdbcContinuumRepository(database("H2", "2.3.232 (2024-08-11)", 2, 3, "unused"));
@@ -162,7 +197,7 @@ class PlatformGuardTest {
       assertThatExceptionOfType(ContinuumPersistenceException.class)
           .isThrownBy(() -> anyOperation(repository))
           .withMessageContaining("H2")
-          .withMessageContaining("certified on PostgreSQL");
+          .withMessageContaining("certified platforms");
     }
 
     @Test

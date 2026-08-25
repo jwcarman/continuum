@@ -27,6 +27,7 @@ final class PostgresSupport {
 
   static {
     POSTGRES.start();
+    TckSchema.applySchema(dataSource(), ContinuumDialect.POSTGRESQL);
   }
 
   static DataSource dataSource() {
@@ -38,6 +39,6 @@ final class PostgresSupport {
   }
 
   static void applySchemaAndTruncate(DataSource dataSource) {
-    TckSchema.applyAndTruncate(dataSource);
+    TckSchema.truncate(dataSource);
   }
 }

@@ -56,7 +56,8 @@ class CockroachCertificationExperiment extends ContinuumTck {
     dataSource.setURL(COCKROACH.getJdbcUrl());
     dataSource.setUser(COCKROACH.getUsername());
     dataSource.setPassword(COCKROACH.getPassword());
-    TckSchema.applyAndTruncate(dataSource);
+    TckSchema.applySchema(dataSource, ContinuumDialect.POSTGRESQL);
+    TckSchema.truncate(dataSource);
     return JdbcContinuumRepository.assumePostgreSql(dataSource);
   }
 }
