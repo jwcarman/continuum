@@ -117,6 +117,16 @@ class TopologyGuardTest {
     }
 
     @Test
+    void a_host_that_merely_contains_the_docdb_suffix_passes() {
+      var repository =
+          new MongoContinuumRepository(
+              server(buildInfo("8.2.12"), replicaSet("foo.docdb.amazonaws.com.example.net:27017")),
+              "app");
+
+      assertThatCode(() -> anyOperation(repository)).doesNotThrowAnyException();
+    }
+
+    @Test
     void detection_runs_once_per_repository() {
       MongoClient client = server(buildInfo("8.2.12"), replicaSet("localhost:27017"));
       var repository = new MongoContinuumRepository(client, "app");

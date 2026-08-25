@@ -47,12 +47,13 @@ final class TopologyGuard {
     }
     Document hello = database.runCommand(new Document("hello", 1));
     for (String host : hosts(hello)) {
-      String lower = host.toLowerCase(Locale.ROOT);
-      if (lower.contains(".docdb.amazonaws.com")
-          || lower.contains(".docdb-elastic.amazonaws.com")) {
+      // hello reports "host:port"; strip the port before matching the hostname suffix.
+      String withoutPort = hostname(host).toLowerCase(Locale.ROOT);
+      if (withoutPort.endsWith(".docdb.amazonaws.com")
+          || withoutPort.endsWith(".docdb-elastic.amazonaws.com")) {
         throw refuse("Amazon DocumentDB (reports as MongoDB " + version + ")");
       }
-      if (lower.contains(".cosmos.azure.com")) {
+      if (withoutPort.endsWith(".cosmos.azure.com")) {
         throw refuse("Azure Cosmos DB (reports as MongoDB " + version + ")");
       }
     }
@@ -99,5 +100,10 @@ final class TopologyGuard {
   private static int major(String version) {
     int dot = version.indexOf('.');
     return Integer.parseInt(dot < 0 ? version : version.substring(0, dot));
+  }
+
+  private static String hostname(String hostAndPort) {
+    int colon = hostAndPort.lastIndexOf(':');
+    return colon < 0 ? hostAndPort : hostAndPort.substring(0, colon);
   }
 }
