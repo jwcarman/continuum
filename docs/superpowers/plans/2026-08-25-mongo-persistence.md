@@ -1326,12 +1326,19 @@ Also add `spring-boot` (the `@ConfigurationProperties` annotation lives in `org.
 package org.jwcarman.continuum.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
 import javax.sql.DataSource;
+import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Nested;
@@ -1349,22 +1356,32 @@ import org.springframework.context.annotation.Configuration;
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class MongoContinuumAutoConfigurationTest {
 
+  // Selection tests are about selection only: ensure-indexes is off so no test here needs a
+  // scripted topology; Mongo_properties covers ensure-indexes on its own.
   private final ApplicationContextRunner runner =
       new ApplicationContextRunner()
           .withConfiguration(
               AutoConfigurations.of(
                   JdbcContinuumAutoConfiguration.class,
                   MongoContinuumAutoConfiguration.class,
-                  ContinuumAutoConfiguration.class));
+                  ContinuumAutoConfiguration.class))
+          .withPropertyValues("continuum.mongo.ensure-indexes=false");
+
+  /** A client whose database and collections are plain mocks, so calls can be verified. */
+  private static MongoClient client(MongoDatabase database) {
+    MongoClient client = mock();
+    MongoCollection<Document> collection = mock();
+    when(client.getDatabase(anyString())).thenReturn(database);
+    when(database.withCodecRegistry(any())).thenReturn(database);
+    when(database.getCollection(anyString())).thenReturn(collection);
+    return client;
+  }
 
   @Configuration(proxyBeanMethods = false)
   static class MongoClientConfiguration {
-    // Deep stubs so getDatabase(...).getCollection(...).createIndex(...) all return mocks.
-    static final MongoClient CLIENT = mock(MongoClient.class, RETURNS_DEEP_STUBS);
-
     @Bean
     MongoClient mongoClient() {
-      return CLIENT;
+      return client(mock());
     }
   }
 
@@ -1463,16 +1480,6 @@ class MongoContinuumAutoConfigurationTest {
 
   @Nested
   class Mongo_properties {
-    /** A client whose database and collections are plain mocks, so index calls can be verified. */
-    private static MongoClient client(MongoDatabase database) {
-      MongoClient client = mock();
-      MongoCollection<Document> collection = mock();
-      when(client.getDatabase(anyString())).thenReturn(database);
-      when(database.withCodecRegistry(any())).thenReturn(database);
-      when(database.getCollection(anyString())).thenReturn(collection);
-      return client;
-    }
-
     private ApplicationContextRunner mongoOnly(MongoClient client) {
       return new ApplicationContextRunner()
           .withConfiguration(
@@ -1542,8 +1549,6 @@ class MongoContinuumAutoConfigurationTest {
   }
 }
 ```
-
-Additional imports for the class: `static org.mockito.ArgumentMatchers.any`, `static org.mockito.ArgumentMatchers.anyString`, `static org.mockito.Mockito.never`, `static org.mockito.Mockito.when`, `com.mongodb.client.MongoCollection`, `com.mongodb.client.MongoDatabase`, `org.bson.Document`, `org.bson.conversions.Bson`. `RETURNS_DEEP_STUBS` is then unused in `MongoClientConfiguration` — use `client(mock())`-style plain mocks there too (`MongoClientConfiguration.CLIENT` only needs `getDatabase(...)`/`getCollection(...)` to return mocks, and `ensure-indexes` defaults to true, so that configuration must also script `buildInfo`/`hello` as in `indexes_are_ensured_at_startup_by_default`, or the `Auto_detection`/`Explicit_type` tests must set `continuum.mongo.ensure-indexes=false` via `withPropertyValues` — do the latter; it keeps those tests about selection only).
 
 - [ ] **Step 3: Run to verify failure**
 
@@ -2007,7 +2012,7 @@ Then watch CI: `gh run watch $(gh run list --branch main --limit 1 --json databa
 
 ## Self-review
 
-**Spec coverage.** Client contract → Task 1. Driver → Task 1 pom. Timestamps/`Instant` codec → Task 1 `Documents`. Storage layout, outcome sub-document, UUID strings → Task 1. Semantics (all ten operations, bookkeeping from SPI instants, `$currentDate`) → Task 1 (Step 6 note fixes the one `Instant.now()`). Indexes + `ensureIndexes()` → Task 2. Guard, escape hatch, unit tests with scripted commands → Task 3. Certification via detecting constructor, `mongo:8.2` → Task 1 (guard added in Task 3 makes it "through the guard"). Boot: auto-configuration, three properties, Session-style selection → Task 4. Docs/README/CHANGELOG → Task 5. BOM and dependencyManagement → Task 1. Out of scope items: none planned, as intended.
+**Spec coverage.** Client contract → Task 1. Driver → Task 1 pom. Timestamps/`Instant` codec → Task 1 `Documents`. Storage layout, outcome sub-document, UUID strings → Task 1. Semantics (all ten operations, bookkeeping from SPI instants, `$currentDate`) → Task 1. Indexes + `ensureIndexes()` → Task 2. Guard, escape hatch, unit tests with scripted commands → Task 3. Certification via detecting constructor, `mongo:8.2` → Task 1 (guard added in Task 3 makes it "through the guard"). Boot: auto-configuration, three properties, Session-style selection → Task 4. Docs/README/CHANGELOG → Task 5. BOM and dependencyManagement → Task 1. Out of scope items: none planned, as intended.
 
 **Placeholder scan.** None — every code step carries its code.
 
