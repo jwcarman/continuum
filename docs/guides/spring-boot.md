@@ -13,15 +13,31 @@ Add the starter:
 A `Continuum` bean is auto-configured. Repository selection:
 
 1. An application-defined `ContinuumRepository` bean always wins.
-2. With `continuum-jdbc` on the classpath **and** a `DataSource` bean,
-   you get durable persistence on a certified platform — PostgreSQL 9.5+,
-   MySQL 8+, MariaDB 10.6+, Oracle 23ai+, or SQL Server 2012+
-   (`JdbcContinuumRepository`).
-   Ordering against Boot's own `DataSourceAutoConfiguration` is handled, so
-   a Boot-auto-configured DataSource counts.
-3. Otherwise the starter falls back to the **in-memory repository and logs a
+2. `continuum.persistence.type` — `jdbc`, `mongo` or `memory` — selects
+   explicitly when set.
+3. Otherwise the single available durable provider is used:
+    - `continuum-jdbc` on the classpath **and** a `DataSource` bean → durable
+      persistence on a certified platform — PostgreSQL 9.5+, MySQL 8+,
+      MariaDB 10.6+, Oracle 23ai+, or SQL Server 2012+
+      (`JdbcContinuumRepository`).
+    - `continuum-mongo` on the classpath **and** a `MongoClient` bean → MongoDB
+      5.0+ replica sets (`MongoContinuumRepository`).
+
+    Ordering against Boot's own `DataSourceAutoConfiguration` and
+    `MongoAutoConfiguration` is handled, so Boot-auto-configured clients count.
+    If **both** are available and the property is unset, startup fails naming
+    the property — the same rule Spring Session applies to `store-type`,
+    because guessing which store holds durable state is worse than asking.
+4. Otherwise the starter falls back to the **in-memory repository and logs a
    warning** — computations will not survive restarts. Fine for tests; not
    for production.
+
+MongoDB properties:
+
+| Property | Default | Meaning |
+|---|---|---|
+| `continuum.mongo.database` | `spring.mongodb.database` (Boot 4) / `spring.data.mongodb.database` (Boot 3), then `test` | database holding the continuum collections |
+| `continuum.mongo.ensure-indexes` | `true` | call `ensureIndexes()` at startup — which also runs the topology check, so a standalone server fails the application at boot rather than at the first completion |
 
 An application-defined `InstantSource` bean is honored (handy for
 deterministic tests); otherwise the system clock is used.

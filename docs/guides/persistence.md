@@ -74,6 +74,56 @@ Four tables: `continuum_computation` (pending only — presence means pending),
 `continuum_continuation`, `continuum_result` (memoized terminal outcomes),
 and `continuum_outbox` (active delivery obligations only).
 
+## MongoDB (`continuum-mongo`)
+
+`MongoContinuumRepository` runs over a plain `MongoClient` and a database name —
+no Spring Data, driver `mongodb-driver-sync` only. Four collections mirror the
+JDBC tables (`continuum_computation`, `continuum_continuation`,
+`continuum_result`, `continuum_outbox`); every operation that touches more than
+one document is a transaction; the outbox claim is a per-document
+`findOneAndUpdate` compare-and-set, which does what `SKIP LOCKED` does in SQL
+with no locking clause at all.
+
+| Platform | Status |
+|---|---|
+| MongoDB 5.0+ replica set (any size, one node is enough) or sharded cluster | **Certified** — full TCK on `mongo:8.2`, every build |
+| MongoDB standalone (no `--replSet`) | **Refused** — no multi-document transactions |
+| MongoDB < 5.0 | **Refused** |
+| Amazon DocumentDB, Azure Cosmos DB (Mongo API), FerretDB | **Refused by name** — not certified |
+
+!!! warning "A replica set is required"
+    Standalone `mongod` has no multi-document transactions, and the ownership
+    transfer in `complete()` — delete the pending document, insert the result,
+    insert the deliveries — must be atomic or a crash between steps loses
+    deliveries silently. A **single node** started with `--replSet rs0` and
+    initiated once (`rs.initiate()`) is all it takes; Atlas, Testcontainers and
+    Boot's docker-compose support all give you one. On first use the repository
+    runs `buildInfo` and `hello` once and refuses anything else, naming what it
+    found and the fix. `MongoContinuumRepository.assumeMongoDb(client, name)`
+    bypasses detection for an operator who knows better.
+
+**Precision.** Instants are stored as BSON `date`: millisecond precision, where
+the JDBC platforms keep microseconds. Nothing in the model needs sub-millisecond
+time; `submittedAt`/`completedAt` read back truncated to the millisecond.
+
+**Indexes — yours, but we help.** Collections appear on first write; the only
+schema is four indexes, which `ensureIndexes()` creates idempotently:
+
+| Collection | Index | Serves |
+|---|---|---|
+| `continuum_computation` | `{kind: 1, deadlineAt: 1}` | `findExpired` |
+| `continuum_continuation` | `{computationId: 1}` | fan-out on `complete` |
+| `continuum_result` | `{kind: 1, completedAt: 1}` | `purgeResults` |
+| `continuum_outbox` | `{kind: 1, availableAt: 1}` | `claimDeliveries` |
+
+Call it once at startup, or let the Spring Boot auto-configuration do so
+(`continuum.mongo.ensure-indexes`, default `true`). The repository never calls
+it on its own.
+
+**Claim cost.** Each claimed delivery is one round trip (`findOneAndUpdate`),
+so a batch of *n* is *n* round trips rather than one query. At pump batch sizes
+this is immaterial; it is the price of a claim that needs no lock.
+
 ## In-memory (`continuum-memory`)
 
 `InMemoryContinuumRepository` is a faithful implementation, not a mock — it

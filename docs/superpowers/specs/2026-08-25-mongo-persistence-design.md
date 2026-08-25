@@ -165,7 +165,7 @@ Properties:
 | Property | Default | Meaning |
 |---|---|---|
 | `continuum.persistence.type` | auto-detect | `jdbc`, `mongo` or `memory`. With exactly one persistence module present it is unnecessary. With both `continuum-jdbc` and `continuum-mongo` present and both a `DataSource` and a `MongoClient` bean, startup fails naming this property and both candidates — the Spring Session `store-type` precedent. |
-| `continuum.mongo.database` | `spring.data.mongodb.database` | database name |
+| `continuum.mongo.database` | `spring.mongodb.database` (Boot 4), then `spring.data.mongodb.database` (Boot 3), then `test` | database name |
 | `continuum.mongo.ensure-indexes` | `true` | call `ensureIndexes()` at startup |
 
 ## Documentation

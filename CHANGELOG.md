@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **`continuum-mongo`: MongoDB persistence, certified.** `MongoContinuumRepository`
+  over a plain `MongoClient` passes the full TCK, concurrency suites included,
+  on MongoDB 8.2 every build; MongoDB 5.0+ replica sets are supported. Four
+  collections mirror the JDBC tables; every multi-document operation is a
+  transaction; the outbox claim is a per-document `findOneAndUpdate`
+  compare-and-set — what `SKIP LOCKED` does in SQL, with no locking clause.
+  Instants are BSON `date` (millisecond precision). `ensureIndexes()` creates
+  the four query indexes idempotently. On first use the repository refuses, by
+  name and with the fix in the message, what cannot meet the TCK: standalone
+  servers (no multi-document transactions — one node with `--replSet` is
+  enough), MongoDB before 5.0, and Amazon DocumentDB, Azure Cosmos DB and
+  FerretDB until certified. `assumeMongoDb` bypasses detection.
+- **`continuum.persistence.type`** (`jdbc` | `mongo` | `memory`) in the Spring
+  Boot auto-configuration. Unnecessary with one durable provider present; with
+  both `continuum-jdbc`+`DataSource` and `continuum-mongo`+`MongoClient`
+  available and the property unset, startup fails naming it — Spring
+  Session's `store-type` rule. Plus `continuum.mongo.database` and
+  `continuum.mongo.ensure-indexes`.
+
 ## [0.4.0] - 2026-08-25
 
 ### Added
