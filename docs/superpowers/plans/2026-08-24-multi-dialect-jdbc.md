@@ -1,8 +1,8 @@
 # Multi-dialect JDBC support via accent
 
-**Status:** design note, nothing implemented
-**Date:** 2026-08-24
-**Target:** 0.4.0 or later — see Sequencing
+**Status:** plan — accent 0.1.0 is released; phases 0–1 are actionable
+**Date:** 2026-08-24 (revised same day: accent released, sequencing corrected)
+**Target:** phase 0 in 0.4.0
 
 ---
 
@@ -26,7 +26,11 @@ Documented narrowly: whether the platform supports `FOR UPDATE SKIP LOCKED`
 skips rather than blocks. Every arm returning `true` is backed by a contention
 test in accent's integration suite, not a syntax check.
 
-Measured by running accent 0.1.0-SNAPSHOT rather than reading its source:
+Measured by running the code rather than reading it — first against
+0.1.0-SNAPSHOT, then re-verified against the released 0.1.0 jar fetched from
+Central (same table). The release also added `EngineVersion` to the
+Postgres-impostor arms, so `CockroachDB` carries both the wire-compat version
+pgjdbc reports (13.0) and the real engine version (v24.1) as data:
 
 | Platform | `supportsSkipLocked()` |
 |---|---|
@@ -132,27 +136,77 @@ The constructor taking an explicit dialect stays. Auto-detection is a
 convenience, not a requirement: someone who knows their database should be able
 to say so and skip the startup query entirely.
 
-## Sequencing
+## Sequencing (corrected)
 
-**Do the fan-out ceiling first.** `complete()` writes one outbox delivery per
-registered continuation in a single transaction, with nothing capping
-continuations per computation. DynamoDB's `TransactWriteItems` caps at 100 items,
-so a document-store provider cannot complete a computation with ~98+
-continuations. That constrains what a non-SQL provider can do *at all*, it lives
-in the SPI contract rather than any provider, and 1.0 freezes it. Multi-dialect
-JDBC is additive by comparison.
+An earlier revision of this note said to do the fan-out ceiling first. That was
+wrong, and is corrected here: the `TransactWriteItems` 100-item cap is a
+document-store property. PostgreSQL has no per-transaction statement cap, and no
+non-SQL provider exists or is planned. The fan-out item is reduced to a
+pre-1.0 contract-wording decision (mark the transaction-size/continuation-count
+coupling provisional in the SPI javadoc; decide the final wording before 1.0)
+and does not gate anything below.
 
-**Then dialects, one at a time, each TCK-certified before it ships.** Suggested
-order by value and by how much new machinery each forces:
+## The plan, phased
 
-1. **CockroachDB / YugabyteDB** — closest to free. Postgres wire protocol,
-   Postgres types, and accent has measured both honouring skip-locked under
-   contention. Mostly a certification exercise, and it would convert
-   `persistence.md`'s current hedge into a supported claim.
-2. **MySQL / MariaDB** — first real type mapping (`BLOB`, no native `UUID`), but
-   skip-locked works on 8+/10.6+.
-3. **SQL Server** — first genuinely different claim statement. Do it last, and
-   only if wanted.
+### Phase 0 — the guard (0.4.0): use accent to close the hole we documented
+
+The first value is not new databases. `persistence.md` currently warns that
+CockroachDB/YugabyteDB report as PostgreSQL and are silently accepted — connect,
+parse, run, no warning anywhere. accent is precisely the `SELECT version()`
+guard that closes it, and someone else has now built and contention-tested it.
+
+- Add `org.jwcarman.accent:accent:0.1.0` to `continuum-jdbc` (zero transitives;
+  verified on the released pom, scoped to the top-level dependencies block).
+- `JdbcContinuumRepository(DataSource)` detects at construction:
+  - `Platform.PostgreSQL` with `supportsSkipLocked()` → proceed (also catches
+    PostgreSQL < 9.5, which today would fail confusingly at claim time).
+  - Anything else → refuse loudly, naming what was detected — including the
+    engine version for impostors, which accent now carries as data:
+    "detected CockroachDB v24.1 (reports as PostgreSQL 13.0); certified
+    platforms: PostgreSQL 9.5+".
+- Escape hatch for the operator who knows better: a second constructor that
+  skips detection. Today that can simply be the existing behavior behind an
+  explicit opt-in; in phase 1 it becomes "supply your own dialect".
+- `persistence.md`'s warning gains a sentence: since 0.4.0 the provider refuses
+  wire-compatible impostors at construction rather than silently accepting them.
+
+This phase changes no SQL and adds no dialect machinery. It converts a
+documented silent failure into a loud one.
+
+### Phase 1 — the dialect seam (with or after phase 0)
+
+Extract `ContinuumDialect` (claim SQL + binary column type, nothing else) and
+make the Postgres dialect the only implementation. Pure refactor, TCK stays
+green, public behavior unchanged. `Platform` selects the dialect; the
+explicit-dialect constructor becomes the escape hatch.
+
+### Phase 2 — certify CockroachDB and YugabyteDB (first real widening)
+
+accent measured both honouring skip-locked under contention; the TCK is the
+gate that turns that into a supported claim. Run `JdbcContinuumTckIT` against
+`cockroachdb/cockroach` and `yugabytedb/yugabyte` Testcontainers. If green:
+same dialect as Postgres, guard widened to admit them, `persistence.md` hedge
+replaced with a supported-platforms table. If red: the guard keeps refusing,
+and the doc gains an evidence-backed exclusion instead of a hedge. Either
+outcome is strictly better than today.
+
+Prediction to test, not assume: both pass with the unmodified Postgres dialect.
+Cockroach has no `pg_advisory_lock`, but continuum uses none; the schema types
+all exist there.
+
+### Phase 3 — MySQL / MariaDB (first real dialect work)
+
+First genuine type mapping: `continuum-mysql.sql` reference DDL (`BINARY(16)`
+or `CHAR(36)` for UUID, `LONGBLOB`, `TIMESTAMP(6)`), a second
+`ContinuumDialect`, TCK against both images and both drivers — the
+mysql-connector-j-against-MariaDB pairing included, since accent exists
+precisely because that pairing lies about identity.
+
+### Phase 4 — SQL Server, only if wanted
+
+First genuinely different claim statement (`WITH (UPDLOCK, READPAST)`), which
+accent's predicate deliberately does not cover. Do last; skip indefinitely
+absent demand.
 
 ## Open questions
 
@@ -167,9 +221,10 @@ order by value and by how much new machinery each forces:
    (`continuum-postgresql.sql`, `continuum-mysql.sql`) or be generated from the
    dialect? Separate files are dumber and more reviewable; generation cannot
    drift.
-4. Does accent belong in `continuum-jdbc` as a hard dependency, or optional with
-   detection degrading to "you must supply a dialect"? Zero transitives makes
-   hard cheap, but optional keeps the module's dependency count at zero.
+4. ~~Hard or optional dependency?~~ Resolved: hard. accent 0.1.0 is a
+   zero-transitive leaf (verified on the released pom), the guard is the point
+   of phase 0 and an optional guard guards nothing, and the escape-hatch
+   constructor already serves whoever cannot tolerate the startup query.
 
 ## Note on how the accent facts above were gathered
 
