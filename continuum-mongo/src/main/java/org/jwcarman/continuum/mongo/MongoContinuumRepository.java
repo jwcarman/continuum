@@ -60,6 +60,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -98,21 +99,40 @@ public final class MongoContinuumRepository implements ContinuumRepository {
   private static final int DUPLICATE_KEY = 11000;
 
   private final MongoClient client;
+  private final MongoDatabase database;
   private final MongoCollection<Document> computations;
   private final MongoCollection<Document> continuations;
   private final MongoCollection<Document> results;
   private final MongoCollection<Document> outbox;
+  private final AtomicBoolean verified;
 
   /**
-   * Creates a repository over the named database. Opens no connection; the topology is verified on
-   * first use.
+   * Creates a repository over the named database. Opens no connection; on first use it verifies the
+   * server is a MongoDB 5.0+ replica set (or mongos) and refuses anything else by name.
    *
    * @param client the application's client — it owns pooling and credentials
    * @param databaseName the database holding the four continuum collections
    */
   public MongoContinuumRepository(MongoClient client, String databaseName) {
+    this(client, databaseName, false);
+  }
+
+  /**
+   * Bypasses topology detection for an operator who knows better — for example a platform the guard
+   * refuses by name that has been certified privately. Accepts the silent-failure risk the guard
+   * exists to remove.
+   *
+   * @param client the application's client
+   * @param databaseName the database holding the four continuum collections
+   * @return a repository that never runs {@code buildInfo}/{@code hello}
+   */
+  public static MongoContinuumRepository assumeMongoDb(MongoClient client, String databaseName) {
+    return new MongoContinuumRepository(client, databaseName, true);
+  }
+
+  private MongoContinuumRepository(MongoClient client, String databaseName, boolean assumed) {
     this.client = Objects.requireNonNull(client, "client must not be null");
-    MongoDatabase database =
+    this.database =
         client
             .getDatabase(Objects.requireNonNull(databaseName, "databaseName must not be null"))
             .withCodecRegistry(Documents.codecRegistry());
@@ -120,6 +140,15 @@ public final class MongoContinuumRepository implements ContinuumRepository {
     this.continuations = database.getCollection(CONTINUATIONS);
     this.results = database.getCollection(RESULTS);
     this.outbox = database.getCollection(OUTBOX);
+    this.verified = new AtomicBoolean(assumed);
+  }
+
+  // Benign race: concurrent first uses verify the same server and reach the same verdict.
+  private void verifyTopology() {
+    if (!verified.get()) {
+      TopologyGuard.verify(database);
+      verified.set(true);
+    }
   }
 
   private <T> T inTransaction(Function<ClientSession, T> body) {
@@ -135,6 +164,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
    * auto-configuration calls it unless {@code continuum.mongo.ensure-indexes=false}.
    */
   public void ensureIndexes() {
+    verifyTopology();
     computations.createIndex(Indexes.ascending(KIND, DEADLINE_AT));
     continuations.createIndex(Indexes.ascending(COMPUTATION_ID));
     results.createIndex(Indexes.ascending(KIND, COMPLETED_AT));
@@ -143,6 +173,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
 
   @Override
   public void createComputation(Computation computation, StoredContinuation initial) {
+    verifyTopology();
     String id = id(computation.id().value());
     try {
       inTransaction(
@@ -174,6 +205,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
   @Override
   public RegistrationOutcome registerContinuation(
       ComputationId computationId, StoredContinuation continuation) {
+    verifyTopology();
     String id = id(computationId.value());
     return inTransaction(
         session -> {
@@ -203,6 +235,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
   @Override
   public CompletionOutcome complete(
       ComputationId computationId, Outcome outcome, Instant completedAt) {
+    verifyTopology();
     String id = id(computationId.value());
     return inTransaction(
         session -> {
@@ -251,6 +284,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
 
   @Override
   public Optional<Computation> findComputation(ComputationId computationId) {
+    verifyTopology();
     String id = id(computationId.value());
     Document pending = computations.find(Filters.eq(ID, id)).first();
     if (pending != null) {
@@ -276,6 +310,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
   @Override
   public List<ClaimedDelivery> claimDeliveries(
       String workerId, ComputationKind kind, int limit, Duration lease, Instant now) {
+    verifyTopology();
     Bson claimable =
         Filters.and(
             Filters.eq(KIND, kind.value()),
@@ -314,11 +349,13 @@ public final class MongoContinuumRepository implements ContinuumRepository {
 
   @Override
   public void acknowledgeDelivery(DeliveryId deliveryId) {
+    verifyTopology();
     outbox.deleteOne(Filters.eq(ID, id(deliveryId.value())));
   }
 
   @Override
   public void releaseDelivery(DeliveryId deliveryId, Instant retryAt) {
+    verifyTopology();
     outbox.updateOne(
         Filters.eq(ID, id(deliveryId.value())),
         Updates.combine(
@@ -330,6 +367,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
 
   @Override
   public List<Computation> findExpired(ComputationKind kind, Instant now, int limit) {
+    verifyTopology();
     List<Computation> expired = new ArrayList<>();
     computations
         .find(Filters.and(Filters.eq(KIND, kind.value()), Filters.lte(DEADLINE_AT, now)))
@@ -341,6 +379,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
 
   @Override
   public void extendDeadline(ComputationId computationId, Instant newDeadline, int attemptCount) {
+    verifyTopology();
     computations.updateOne(
         Filters.eq(ID, id(computationId.value())),
         Updates.combine(
@@ -351,6 +390,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
 
   @Override
   public int purgeResults(ComputationKind kind, Instant olderThan, int limit) {
+    verifyTopology();
     List<String> ids = new ArrayList<>();
     results
         .find(Filters.and(Filters.eq(KIND, kind.value()), Filters.lt(COMPLETED_AT, olderThan)))
