@@ -26,7 +26,9 @@ import org.springframework.context.annotation.Bean;
 
 /**
  * Configures durable JDBC persistence (certified: PostgreSQL, MySQL, MariaDB, Oracle, SQL Server)
- * when {@code continuum-jdbc} is on the classpath and the application defines a {@link DataSource}.
+ * when {@code continuum-jdbc} is on the classpath, the application defines a {@link DataSource},
+ * and {@code continuum.persistence.type} either selects {@code jdbc} or is absent with no competing
+ * MongoDB candidate.
  */
 @AutoConfiguration(
     before = ContinuumAutoConfiguration.class,
@@ -39,6 +41,7 @@ import org.springframework.context.annotation.Bean;
     })
 @ConditionalOnClass(JdbcContinuumRepository.class)
 @ConditionalOnBean(DataSource.class)
+@ConditionalOnPersistenceType(PersistenceType.JDBC)
 public class JdbcContinuumAutoConfiguration {
 
   /** Instantiated by Spring Boot's auto-configuration machinery, not by application code. */

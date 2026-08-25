@@ -53,8 +53,9 @@ public class ContinuumAutoConfiguration {
   public ContinuumRepository inMemoryContinuumRepository() {
     log.warn(
         "No durable Continuum persistence configured; defaulting to the in-memory repository. "
-            + "Computations will NOT survive restarts. Add continuum-jdbc and a DataSource "
-            + "(or define your own ContinuumRepository bean) for durability.");
+            + "Computations will NOT survive restarts. Add continuum-jdbc and a DataSource, or "
+            + "continuum-mongo and a MongoClient (or define your own ContinuumRepository bean) "
+            + "for durability.");
     return new InMemoryContinuumRepository();
   }
 

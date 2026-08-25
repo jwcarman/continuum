@@ -1,2 +1,3 @@
 org.jwcarman.continuum.autoconfigure.JdbcContinuumAutoConfiguration
+org.jwcarman.continuum.autoconfigure.MongoContinuumAutoConfiguration
 org.jwcarman.continuum.autoconfigure.ContinuumAutoConfiguration
