@@ -131,6 +131,14 @@ class PlatformGuardTest {
     }
 
     @Test
+    void oracle_23_passes() throws SQLException {
+      var repository =
+          new JdbcContinuumRepository(
+              database("Oracle", "Oracle Database 23ai Free Release 23.0.0.0.0", 23, 0, "unused"));
+      assertThatCode(() -> anyOperation(repository)).doesNotThrowAnyException();
+    }
+
+    @Test
     void h2_passes_as_a_test_embedded_platform() throws SQLException {
       var repository =
           new JdbcContinuumRepository(database("H2", "2.3.232 (2024-08-11)", 2, 3, "unused"));

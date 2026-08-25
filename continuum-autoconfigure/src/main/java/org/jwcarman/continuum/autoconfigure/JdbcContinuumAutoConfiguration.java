@@ -25,7 +25,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 
 /**
- * Configures durable JDBC persistence (certified: PostgreSQL, MySQL, MariaDB) when {@code
+ * Configures durable JDBC persistence (certified: PostgreSQL, MySQL, MariaDB, Oracle) when {@code
  * continuum-jdbc} is on the classpath and the application defines a {@link DataSource}.
  */
 @AutoConfiguration(

@@ -47,9 +47,9 @@ import org.jwcarman.continuum.spi.RegistrationOutcome;
 import org.jwcarman.continuum.spi.StoredContinuation;
 
 /**
- * JDBC persistence over a plain {@link DataSource}, certified on PostgreSQL 9.5+, MySQL 8+ and
- * MariaDB 10.6+ for production, and on H2 2.3+ for test/embedded use — each passes the full TCK
- * battery, concurrency suites included, on every build. Completion is a single-transaction
+ * JDBC persistence over a plain {@link DataSource}, certified on PostgreSQL 9.5+, MySQL 8+, MariaDB
+ * 10.6+ and Oracle 23ai+ for production, and on H2 2.3+ for test/embedded use — each passes the
+ * full TCK battery, concurrency suites included, on every build. Completion is a single-transaction
  * ownership transfer; outbox claiming uses {@code FOR UPDATE SKIP LOCKED} so competing consumers
  * never block. Schema is application-owned — see the classpath resources {@code
  * continuum-postgresql.sql} and {@code continuum-mysql.sql}.
@@ -171,6 +171,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
           // Certified for test/embedded use: passes the full TCK in both default and
           // PostgreSQL-compatibility modes, and speaks the PostgreSQL DDL verbatim.
           case Platform.H2 h2 when h2.supportsSkipLocked() -> ContinuumDialect.POSTGRESQL;
+          case Platform.Oracle oracle when oracle.supportsSkipLocked() -> ContinuumDialect.ORACLE;
           default -> throw new ContinuumPersistenceException(refusal(platform));
         };
     dialect = resolved;
@@ -207,7 +208,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
         };
     return "unsupported database platform: "
         + detected
-        + "; certified platforms: PostgreSQL 9.5+, MySQL 8+, MariaDB 10.6+,"
+        + "; certified platforms: PostgreSQL 9.5+, MySQL 8+, MariaDB 10.6+, Oracle 23ai+,"
         + " H2 2.3+ (test/embedded only)."
         + " To use an uncertified platform anyway, construct via"
         + " JdbcContinuumRepository.withDialect(dataSource, dialect) — after running the TCK"
@@ -505,13 +506,19 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                       + "FROM continuum_outbox "
                       + "WHERE kind = ? AND available_at <= ? "
                       + " AND (claimed_until IS NULL OR claimed_until <= ?) "
-                      + "ORDER BY available_at LIMIT ? FOR UPDATE SKIP LOCKED")) {
+                      + "ORDER BY available_at"
+                      + (dialect().limitsLockingReads() ? dialect().limitClause() : "")
+                      + " FOR UPDATE SKIP LOCKED")) {
             select.setString(1, kind.value());
             select.setTimestamp(2, Timestamp.from(now));
             select.setTimestamp(3, Timestamp.from(now));
-            select.setInt(4, limit);
+            if (dialect().limitsLockingReads()) {
+              select.setInt(4, limit);
+            }
             try (ResultSet row = select.executeQuery()) {
-              while (row.next()) {
+              // The size check is the whole limit on dialects whose locking reads cannot carry
+              // one; elsewhere it is redundant with the SQL and harmless.
+              while (claimed.size() < limit && row.next()) {
                 claimed.add(
                     new ClaimedDelivery(
                         new DeliveryId(dialect().getUuid(row, ID_COLUMN)),
@@ -580,7 +587,8 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
               connection.prepareStatement(
                   "SELECT id, kind, deadline_at, dispatch_payload, attempt_count, submitted_at "
                       + "FROM continuum_computation WHERE kind = ? AND deadline_at <= ? "
-                      + "ORDER BY deadline_at LIMIT ?")) {
+                      + "ORDER BY deadline_at"
+                      + dialect().limitClause())) {
             select.setString(1, kind.value());
             select.setTimestamp(2, Timestamp.from(now));
             select.setInt(3, limit);
@@ -625,7 +633,9 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                   "DELETE FROM continuum_result WHERE computation_id IN ("
                       + "SELECT computation_id FROM ("
                       + "SELECT computation_id FROM continuum_result "
-                      + "WHERE kind = ? AND completed_at < ? LIMIT ?) purgeable)")) {
+                      + "WHERE kind = ? AND completed_at < ?"
+                      + dialect().limitClause()
+                      + ") purgeable)")) {
             delete.setString(1, kind.value());
             delete.setTimestamp(2, Timestamp.from(olderThan));
             delete.setInt(3, limit);

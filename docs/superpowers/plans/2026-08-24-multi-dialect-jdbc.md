@@ -278,6 +278,15 @@ precisely because that pairing lies about identity.
 > cannot offer since it bypasses SQL entirely. The case against: "certified"
 > currently connotes production-supportable, and H2 is not that.
 
+### Oracle (2026-08-25, chosen over SQL Server by usage ranking) — CERTIFIED
+
+> 26/26 on gvenzl/oracle-free:23-slim-faststart. First run got 15/26 with every
+> failure ORA-12516 — session exhaustion from an unpooled DataSource under the
+> race loops, not semantics; pooling (UCP, max 8) gave a clean pass. The dialect
+> gained its first SQL-shaping method (`limitClause()`) and its first behavioral
+> one (`limitsLockingReads()` — Oracle cannot lock through a row-limited read,
+> so the claim caps in Java, locking rows as fetched).
+
 ### Phase 4 — SQL Server, only if wanted
 
 First genuinely different claim statement (`WITH (UPDLOCK, READPAST)`), which

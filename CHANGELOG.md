@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **`continuum-jdbc` supports Oracle 23ai+, certified.** Full TCK, concurrency
+  suites included, on every build. Oracle brought the dialect seam its first
+  genuine behavioral difference: a row-limited read cannot be locked (Oracle's
+  `FETCH FIRST` is an inline view), so the claim query carries no limit there
+  and the provider stops fetching after `limit` rows, locking each as read —
+  the Oracle AQ dequeue idiom. Plus `FETCH FIRST ? ROWS ONLY` in place of
+  `LIMIT ?`, and a `continuum-oracle.sql` reference DDL (`VARCHAR2(36)`,
+  `BLOB`, `CLOB`). The certification suite pools connections via UCP; an
+  unpooled `OracleDataSource` opens a physical session per operation and the
+  TCK's race loops exhaust Oracle Free's session cap.
+
+
 - **H2 2.3+ is certified for test/embedded use.** It passes the full TCK in
   both default and PostgreSQL-compatibility modes, and the reference PostgreSQL
   DDL now serves it verbatim (`TIMESTAMP(6) WITH TIME ZONE` is spelled out

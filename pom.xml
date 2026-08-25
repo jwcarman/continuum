@@ -453,6 +453,9 @@
                                              no source imports it, and the experiment's own DataSource is
                                              pgjdbc via PGSimpleDataSource, which bypasses DriverManager. -->
                                         <ignoredUnusedDeclaredDependency>com.yugabyte:jdbc-yugabytedb</ignoredUnusedDeclaredDependency>
+                                        <!-- Loaded reflectively by Oracle UCP via the connection-factory class
+                                             name string; the certification suite imports only oracle.ucp.* -->
+                                        <ignoredUnusedDeclaredDependency>com.oracle.database.jdbc:ojdbc11</ignoredUnusedDeclaredDependency>
                                         <!-- continuum-spring-boot-starter ships no code: it is dependencies-only
                                              by design, so everything it declares is "unused" by definition. That
                                              also leaves it with the parent's inherited test dependencies and no

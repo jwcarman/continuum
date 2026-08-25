@@ -23,12 +23,12 @@ import java.util.UUID;
 /**
  * What actually varies between certified platforms — which is deliberately almost nothing.
  *
- * <p>The query shapes are identical across PostgreSQL, MySQL 8+ and MariaDB 10.6+: {@code FOR
- * UPDATE SKIP LOCKED}, {@code LIMIT ?} and the rest are valid unchanged on all three. What differs
- * is one JDBC-layer fact — PostgreSQL has a native {@code uuid} type that pgjdbc binds via {@code
- * setObject}/{@code getObject}, while MySQL and MariaDB store identities as {@code CHAR(36)} and
- * bind them as strings — plus the type names in each platform's reference DDL, which live in the
- * per-dialect {@code .sql} resource rather than here.
+ * <p>The query shapes are nearly identical across PostgreSQL, MySQL, MariaDB and Oracle. What
+ * differs: how identities bind (PostgreSQL has a native {@code uuid} type; the others store {@code
+ * CHAR(36)}/{@code VARCHAR2(36)} strings), the type names in each platform's reference DDL (in the
+ * per-dialect {@code .sql} resource, not here), the spelling of the row-limit clause, and one real
+ * behavioral difference — Oracle cannot lock through a row-limited read, so its claim query stops
+ * fetching after {@code limit} rows instead of saying so in SQL.
  *
  * <p>Time-ordering survives the string representation: identities are UUIDv7, whose canonical text
  * form sorts identically to its byte order, so {@code CHAR(36)} keys keep the index-locality
@@ -46,6 +46,12 @@ public interface ContinuumDialect {
 
   /** MySQL 8+ and MariaDB 10.6+: {@code CHAR(36)} columns, bound as canonical UUID strings. */
   ContinuumDialect MYSQL = new MySqlDialect();
+
+  /**
+   * Oracle 23ai+: {@code VARCHAR2(36)} identities, {@code FETCH FIRST} row limiting, and — the one
+   * genuinely different behavior — a locking read that cannot carry a row limit.
+   */
+  ContinuumDialect ORACLE = new OracleDialect();
 
   /**
    * Binds an identity parameter.
@@ -74,6 +80,28 @@ public interface ContinuumDialect {
    */
   String schemaResource();
 
+  /**
+   * The row-limiting clause, with one positional parameter for the count, to append after {@code
+   * ORDER BY}: {@code LIMIT ?} on PostgreSQL/MySQL, {@code FETCH FIRST ? ROWS ONLY} on Oracle.
+   *
+   * @return the clause including its leading space
+   */
+  default String limitClause() {
+    return " LIMIT ?";
+  }
+
+  /**
+   * Whether {@link #limitClause()} may accompany {@code FOR UPDATE SKIP LOCKED}. Oracle rejects a
+   * row-limited locking read (its row limiting is an inline view, and views cannot be locked), so
+   * there the claim query omits the clause and the provider stops reading after {@code limit} rows
+   * instead — Oracle locks rows as they are fetched, which is the Oracle AQ dequeue idiom.
+   *
+   * @return true if the claim query may carry the limit clause
+   */
+  default boolean limitsLockingReads() {
+    return true;
+  }
+
   final class PostgresDialect implements ContinuumDialect {
     private PostgresDialect() {}
 
@@ -90,6 +118,35 @@ public interface ContinuumDialect {
     @Override
     public String schemaResource() {
       return "/org/jwcarman/continuum/jdbc/continuum-postgresql.sql";
+    }
+  }
+
+  final class OracleDialect implements ContinuumDialect {
+    private OracleDialect() {}
+
+    @Override
+    public void setUuid(PreparedStatement statement, int index, UUID uuid) throws SQLException {
+      statement.setString(index, uuid.toString());
+    }
+
+    @Override
+    public UUID getUuid(ResultSet row, String column) throws SQLException {
+      return UUID.fromString(row.getString(column));
+    }
+
+    @Override
+    public String schemaResource() {
+      return "/org/jwcarman/continuum/jdbc/continuum-oracle.sql";
+    }
+
+    @Override
+    public String limitClause() {
+      return " FETCH FIRST ? ROWS ONLY";
+    }
+
+    @Override
+    public boolean limitsLockingReads() {
+      return false;
     }
   }
 

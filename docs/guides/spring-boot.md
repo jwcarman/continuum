@@ -15,7 +15,7 @@ A `Continuum` bean is auto-configured. Repository selection:
 1. An application-defined `ContinuumRepository` bean always wins.
 2. With `continuum-jdbc` on the classpath **and** a `DataSource` bean,
    you get durable persistence on a certified platform — PostgreSQL 9.5+,
-   MySQL 8+, or MariaDB 10.6+ (`JdbcContinuumRepository`).
+   MySQL 8+, MariaDB 10.6+, or Oracle 23ai+ (`JdbcContinuumRepository`).
    Ordering against Boot's own `DataSourceAutoConfiguration` is handled, so
    a Boot-auto-configured DataSource counts.
 3. Otherwise the starter falls back to the **in-memory repository and logs a
