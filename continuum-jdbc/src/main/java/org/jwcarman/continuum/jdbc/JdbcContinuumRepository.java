@@ -28,6 +28,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.jwcarman.accent.Accent;
+import org.jwcarman.accent.AccentException;
+import org.jwcarman.accent.Platform;
 import org.jwcarman.continuum.api.CompletionDelivery;
 import org.jwcarman.continuum.api.Computation;
 import org.jwcarman.continuum.api.ComputationId;
@@ -69,15 +72,43 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
   private static final String ATTEMPT_COUNT_COLUMN = "attempt_count";
 
   private final DataSource dataSource;
+  private final boolean verifyPlatform;
+  private volatile boolean platformVerified;
 
   /**
    * Binds this repository to a data source. No schema is created or validated here — run {@code
    * continuum-postgresql.sql} before first use.
    *
+   * <p>On first use — not at construction, so wiring a bean never opens a connection — the
+   * repository verifies it is actually talking to PostgreSQL 9.5+ and refuses anything else,
+   * loudly. This exists because wire-compatible databases lie: CockroachDB and YugabyteDB report
+   * {@code PostgreSQL} through every metadata field a driver exposes and <em>accept</em> {@code FOR
+   * UPDATE SKIP LOCKED} rather than rejecting it, so without detection the claim query parses,
+   * runs, and warns nobody while the lock semantics the outbox's competing-consumer guarantee rests
+   * on go unverified. Detection is one {@code SELECT version()} round trip, once per repository
+   * instance.
+   *
    * @param dataSource the PostgreSQL data source; the application owns pooling and schema
    */
   public JdbcContinuumRepository(DataSource dataSource) {
+    this(dataSource, true);
+  }
+
+  private JdbcContinuumRepository(DataSource dataSource, boolean verifyPlatform) {
     this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
+    this.verifyPlatform = verifyPlatform;
+  }
+
+  /**
+   * Binds this repository to a data source, skipping platform detection entirely — the escape hatch
+   * for an operator who knows better than the driver's answer, at the cost of the
+   * wire-compatible-impostor protection the detecting constructor provides.
+   *
+   * @param dataSource a data source the caller asserts is PostgreSQL 9.5+
+   * @return a repository that will never run detection
+   */
+  public static JdbcContinuumRepository assumePostgreSql(DataSource dataSource) {
+    return new JdbcContinuumRepository(dataSource, false);
   }
 
   @FunctionalInterface
@@ -88,10 +119,61 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
   private <T> T inTransaction(SqlWork<T> work) {
     try (Connection connection = dataSource.getConnection()) {
       connection.setAutoCommit(false);
+      verifyPlatform(connection);
       return commitOrRollback(work, connection);
     } catch (SQLException e) {
       throw new ContinuumPersistenceException("database operation failed", e);
     }
+  }
+
+  private void verifyPlatform(Connection connection) {
+    if (!verifyPlatform || platformVerified) {
+      return;
+    }
+    Platform platform;
+    try {
+      platform = Accent.of(connection);
+    } catch (AccentException e) {
+      throw new ContinuumPersistenceException("database platform detection failed", e);
+    }
+    if (platform instanceof Platform.PostgreSQL postgres && postgres.supportsSkipLocked()) {
+      // Benign race: concurrent first uses may each verify; every path is idempotent.
+      platformVerified = true;
+      return;
+    }
+    throw new ContinuumPersistenceException(refusal(platform));
+  }
+
+  // Not an exhaustive switch on purpose: accent's Platform is sealed, and a new arm added there
+  // must not break this compile — anything unrecognised falls through to the generic description.
+  private static String refusal(Platform platform) {
+    String detected =
+        switch (platform) {
+          case Platform.PostgreSQL postgres ->
+              "PostgreSQL "
+                  + postgres.majorVersion()
+                  + "."
+                  + postgres.minorVersion()
+                  + ", which lacks FOR UPDATE SKIP LOCKED";
+          case Platform.CockroachDB cockroach ->
+              "CockroachDB "
+                  + cockroach.engine().raw()
+                  + " (reports as PostgreSQL "
+                  + cockroach.productVersion()
+                  + ")";
+          case Platform.YugabyteDB yugabyte ->
+              "YugabyteDB "
+                  + yugabyte.engine().raw()
+                  + " (reports as PostgreSQL "
+                  + yugabyte.productVersion()
+                  + ")";
+          default -> platform.productName() + " " + platform.productVersion();
+        };
+    return "unsupported database platform: "
+        + detected
+        + "; continuum-jdbc is certified on PostgreSQL 9.5+."
+        + " If you are certain this database behaves as PostgreSQL, construct via"
+        + " JdbcContinuumRepository.assumePostgreSql(dataSource) to bypass detection.";
   }
 
   private static <T> T commitOrRollback(SqlWork<T> work, Connection connection)

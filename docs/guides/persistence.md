@@ -16,15 +16,22 @@ their own providers certified against the TCK.
     **accept** `FOR UPDATE SKIP LOCKED` rather than rejecting it. Neither is
     tested or supported here.
 
-    So the failure mode is silent: the driver connects, the metadata says
-    PostgreSQL, the claim query parses and runs, and nothing warns you. But
-    parse success is not semantic support, and `claimDeliveries` is the one
+    Parse success is not semantic support, and `claimDeliveries` is the one
     operation where the difference is load-bearing — the competing-consumer
     guarantee above rests on PostgreSQL's lock semantics specifically.
 
-    Certify against the TCK before trusting either. The concurrency battery
-    asserts observable contract rather than mechanism, so it can settle the
-    question in both directions.
+    **Since 0.4.0 the repository refuses impostors instead of silently
+    accepting them.** On first use it detects the actual platform (via
+    [accent](https://github.com/jwcarman/accent), one `SELECT version()`
+    round trip, once per instance) and throws unless it finds genuine
+    PostgreSQL 9.5+ — naming what it found, real engine version included.
+    An operator who knows better can bypass detection with
+    `JdbcContinuumRepository.assumePostgreSql(dataSource)`, accepting the
+    silent-failure risk the guard exists to remove.
+
+    Certify against the TCK before trusting a wire-compatible database. The
+    concurrency battery asserts observable contract rather than mechanism, so
+    it can settle the question in both directions.
 
 ### Schema — yours, not ours
 

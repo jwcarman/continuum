@@ -59,6 +59,7 @@
         <jacocoArgLine></jacocoArgLine>
 
         <codec.version>0.4.0</codec.version>
+        <accent.version>0.1.0</accent.version>
         <jug.version>5.2.0</jug.version>
         <slf4j.version>2.0.17</slf4j.version>
         <logback.version>1.5.32</logback.version>
@@ -145,6 +146,11 @@
                 <groupId>com.fasterxml.uuid</groupId>
                 <artifactId>java-uuid-generator</artifactId>
                 <version>${jug.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jwcarman.accent</groupId>
+                <artifactId>accent</artifactId>
+                <version>${accent.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>

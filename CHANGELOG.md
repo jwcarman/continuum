@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **`continuum-jdbc` now refuses databases that merely impersonate PostgreSQL.**
+  CockroachDB and YugabyteDB report `PostgreSQL` through every metadata field a
+  driver exposes and *accept* `FOR UPDATE SKIP LOCKED`, so pointing the
+  repository at one used to connect, parse, run, and warn nobody — while the
+  lock semantics the outbox's competing-consumer guarantee rests on went
+  unverified. On first use (not at construction — wiring a bean opens no
+  connection) the repository now detects the actual platform via
+  `org.jwcarman.accent:accent` (zero transitive dependencies) and throws unless
+  it finds genuine PostgreSQL 9.5+, naming what it found:
+  `unsupported database platform: CockroachDB v24.1.0 (reports as PostgreSQL
+  13.0.0)`. Also catches PostgreSQL < 9.5, which previously failed confusingly
+  at claim time. `JdbcContinuumRepository.assumePostgreSql(dataSource)` bypasses
+  detection for operators who know better.
+
+
 ## [0.3.0] - 2026-08-24
 
 ### Breaking changes

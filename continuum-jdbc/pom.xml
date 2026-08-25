@@ -34,6 +34,10 @@
             <artifactId>continuum-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.jwcarman.accent</groupId>
+            <artifactId>accent</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>provided</scope>
