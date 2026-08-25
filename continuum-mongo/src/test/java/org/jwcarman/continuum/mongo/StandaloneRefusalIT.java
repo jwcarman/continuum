@@ -69,9 +69,10 @@ class StandaloneRefusalIT {
   @Test
   void a_real_standalone_server_is_refused_on_first_use_with_the_fix() {
     var repository = new MongoContinuumRepository(CLIENT, DATABASE);
+    ComputationId id = ComputationId.random();
 
     assertThatExceptionOfType(ContinuumPersistenceException.class)
-        .isThrownBy(() -> repository.findComputation(ComputationId.random()))
+        .isThrownBy(() -> repository.findComputation(id))
         .withMessageContaining("MongoDB 8.2")
         .withMessageContaining("standalone")
         .withMessageContaining("--replSet")
@@ -81,14 +82,14 @@ class StandaloneRefusalIT {
   @Test
   void bypassing_the_guard_fails_at_the_first_ownership_transfer() {
     var repository = MongoContinuumRepository.assumeMongoDb(CLIENT, DATABASE);
-    ComputationId id = ComputationId.random();
+    Computation computation = computation(ComputationId.random());
     StoredContinuation continuation = new StoredContinuation(ContinuationId.random(), new byte[0]);
 
     // The refusal is not a preference: the driver itself rejects the transaction the ownership
     // transfer needs, and the message is the server's — the guard merely says it earlier and
     // better.
     assertThatExceptionOfType(MongoException.class)
-        .isThrownBy(() -> repository.createComputation(computation(id), continuation))
+        .isThrownBy(() -> repository.createComputation(computation, continuation))
         .withMessageContaining("replica set");
   }
 }
