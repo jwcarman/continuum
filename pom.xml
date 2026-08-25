@@ -58,7 +58,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jacocoArgLine></jacocoArgLine>
 
-        <codec.version>0.4.0</codec.version>
+        <codec.version>0.6.0</codec.version>
         <accent.version>0.1.0</accent.version>
         <jug.version>5.2.0</jug.version>
         <slf4j.version>2.0.18</slf4j.version>

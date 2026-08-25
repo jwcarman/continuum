@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- codec 0.6.0 (from 0.4.0). Purely additive upstream — new backends and
+  transforms (`codec-crypto`, `codec-fory`, `codec-jsonb`, `codec-zstd`,
+  `Base64Codec`); nothing continuum uses changed.
+- Test infrastructure: Testcontainers 2.0.5 and JUnit 6.1.3, every module on
+  the same JUnit line; test output no longer defaults to DEBUG.
+
 ### Added
 
 - **`continuum-mongo`: MongoDB persistence, certified.** `MongoContinuumRepository`
