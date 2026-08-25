@@ -50,6 +50,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
@@ -125,6 +126,19 @@ public final class MongoContinuumRepository implements ContinuumRepository {
     try (ClientSession session = client.startSession()) {
       return session.withTransaction(() -> body.apply(session));
     }
+  }
+
+  /**
+   * Creates the four indexes the query paths rely on, if they do not already exist. Idempotent and
+   * cheap — safe on every startup. Never called by the repository itself: like the JDBC schema,
+   * indexes are the application's to manage, and this is the helper for doing so. The Spring Boot
+   * auto-configuration calls it unless {@code continuum.mongo.ensure-indexes=false}.
+   */
+  public void ensureIndexes() {
+    computations.createIndex(Indexes.ascending(KIND, DEADLINE_AT));
+    continuations.createIndex(Indexes.ascending(COMPUTATION_ID));
+    results.createIndex(Indexes.ascending(KIND, COMPLETED_AT));
+    outbox.createIndex(Indexes.ascending(KIND, AVAILABLE_AT));
   }
 
   @Override
