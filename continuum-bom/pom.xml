@@ -160,6 +160,11 @@
             </dependency>
             <dependency>
                 <groupId>org.jwcarman.continuum</groupId>
+                <artifactId>continuum-mongo</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jwcarman.continuum</groupId>
                 <artifactId>continuum-testing</artifactId>
                 <version>${project.version}</version>
             </dependency>

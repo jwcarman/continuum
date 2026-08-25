@@ -69,6 +69,7 @@
         <bytebuddy.version>1.18.12</bytebuddy.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <postgresql.version>42.7.13</postgresql.version>
+        <mongodb.version>5.3.1</mongodb.version>
         <spring-boot.version>4.0.5</spring-boot.version>
 
         <surefire.plugin.version>3.5.6</surefire.plugin.version>
@@ -117,6 +118,7 @@
         <module>continuum-memory</module>
         <module>continuum-testing</module>
         <module>continuum-jdbc</module>
+        <module>continuum-mongo</module>
         <module>continuum-autoconfigure</module>
         <module>continuum-spring-boot-starter</module>
     </modules>
@@ -206,6 +208,26 @@
                 <groupId>org.jwcarman.continuum</groupId>
                 <artifactId>continuum-jdbc</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jwcarman.continuum</groupId>
+                <artifactId>continuum-mongo</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mongodb</groupId>
+                <artifactId>mongodb-driver-sync</artifactId>
+                <version>${mongodb.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mongodb</groupId>
+                <artifactId>mongodb-driver-core</artifactId>
+                <version>${mongodb.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mongodb</groupId>
+                <artifactId>bson</artifactId>
+                <version>${mongodb.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.jwcarman.continuum</groupId>
