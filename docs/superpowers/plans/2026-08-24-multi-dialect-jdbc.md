@@ -261,6 +261,23 @@ or `CHAR(36)` for UUID, `LONGBLOB`, `TIMESTAMP(6)`), a second
 mysql-connector-j-against-MariaDB pairing included, since accent exists
 precisely because that pairing lies about identity.
 
+### Unplanned: H2 (2026-08-25) — passes, admission pending a support-policy call
+
+> Not in the original phases; run because H2 is every Spring Boot shop's test
+> database and the guard refuses it by name. **26/26 in PostgreSQL compatibility
+> mode AND in default mode**, ~2 seconds each, in-process, no container. The
+> only friction: H2 rejects the `TIMESTAMPTZ` alias and wants
+> `TIMESTAMP(6) WITH TIME ZONE` — which PostgreSQL also accepts, so the
+> reference DDL could serve both verbatim if admission is granted.
+>
+> Admission is deliberately NOT implemented: certifying that the contract holds
+> is this experiment's job; deciding whether an in-memory test database belongs
+> on the certified list — with whatever production-blessing that implies — is
+> James's. The case for: Boot users could integration-test the real JDBC
+> provider (SQL, schema, dialect) without containers, which `continuum-memory`
+> cannot offer since it bypasses SQL entirely. The case against: "certified"
+> currently connotes production-supportable, and H2 is not that.
+
 ### Phase 4 — SQL Server, only if wanted
 
 First genuinely different claim statement (`WITH (UPDLOCK, READPAST)`), which
