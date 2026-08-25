@@ -61,27 +61,27 @@
         <codec.version>0.4.0</codec.version>
         <accent.version>0.1.0</accent.version>
         <jug.version>5.2.0</jug.version>
-        <slf4j.version>2.0.17</slf4j.version>
+        <slf4j.version>2.0.18</slf4j.version>
         <logback.version>1.5.32</logback.version>
         <junit.version>5.14.0</junit.version>
         <assertj.version>3.27.7</assertj.version>
         <mockito.version>5.23.0</mockito.version>
-        <bytebuddy.version>1.18.8</bytebuddy.version>
+        <bytebuddy.version>1.18.12</bytebuddy.version>
         <testcontainers.version>1.21.4</testcontainers.version>
-        <postgresql.version>42.7.12</postgresql.version>
+        <postgresql.version>42.7.13</postgresql.version>
         <spring-boot.version>4.0.5</spring-boot.version>
 
-        <surefire.plugin.version>3.5.4</surefire.plugin.version>
+        <surefire.plugin.version>3.5.6</surefire.plugin.version>
         <dependency.plugin.version>3.11.0</dependency.plugin.version>
-        <enforcer.plugin.version>3.6.2</enforcer.plugin.version>
-        <spotless.version>3.4.0</spotless.version>
+        <enforcer.plugin.version>3.6.3</enforcer.plugin.version>
+        <spotless.version>3.10.0</spotless.version>
         <gpg.plugin.version>3.2.8</gpg.plugin.version>
         <javadoc.plugin.version>3.12.0</javadoc.plugin.version>
         <source.plugin.version>3.4.0</source.plugin.version>
-        <sonatype.plugin.version>0.10.0</sonatype.plugin.version>
-        <license.plugin.version>5.0.0</license.plugin.version>
-        <jacoco.plugin.version>0.8.14</jacoco.plugin.version>
-        <sonar.plugin.version>5.5.0.6356</sonar.plugin.version>
+        <sonatype.plugin.version>0.11.0</sonatype.plugin.version>
+        <license.plugin.version>5.1.2</license.plugin.version>
+        <jacoco.plugin.version>0.8.15</jacoco.plugin.version>
+        <sonar.plugin.version>5.7.0.6970</sonar.plugin.version>
 
         <license.owner>James Carman</license.owner>
 

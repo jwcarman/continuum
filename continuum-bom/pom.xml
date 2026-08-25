@@ -105,8 +105,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <gpg.plugin.version>3.2.8</gpg.plugin.version>
         <sonatype.plugin.version>0.10.0</sonatype.plugin.version>
-        <spotless.version>3.4.0</spotless.version>
-        <sonar.plugin.version>5.5.0.6356</sonar.plugin.version>
+        <spotless.version>3.10.0</spotless.version>
+        <sonar.plugin.version>5.7.0.6970</sonar.plugin.version>
         <!-- Nothing to analyse: this module is a dependencyManagement declaration. -->
         <sonar.skip>true</sonar.skip>
     </properties>
