@@ -131,6 +131,13 @@ class PlatformGuardTest {
     }
 
     @Test
+    void h2_passes_as_a_test_embedded_platform() throws SQLException {
+      var repository =
+          new JdbcContinuumRepository(database("H2", "2.3.232 (2024-08-11)", 2, 3, "unused"));
+      assertThatCode(() -> anyOperation(repository)).doesNotThrowAnyException();
+    }
+
+    @Test
     void detection_runs_once_not_per_operation() throws SQLException {
       var dataSource =
           database("PostgreSQL", "17.10", 17, 10, "PostgreSQL 17.10 on aarch64-unknown-linux-gnu");
@@ -192,17 +199,18 @@ class PlatformGuardTest {
     @Test
     void an_unrelated_database_is_refused_by_name() throws SQLException {
       var repository =
-          new JdbcContinuumRepository(database("H2", "2.3.232 (2024-08-11)", 2, 3, "unused"));
+          new JdbcContinuumRepository(database("HSQL Database Engine", "2.7.4", 2, 7, "unused"));
 
       assertThatExceptionOfType(ContinuumPersistenceException.class)
           .isThrownBy(() -> anyOperation(repository))
-          .withMessageContaining("H2")
+          .withMessageContaining("HSQL")
           .withMessageContaining("certified platforms");
     }
 
     @Test
     void refusal_repeats_on_every_attempt_rather_than_latching_open() throws SQLException {
-      var repository = new JdbcContinuumRepository(database("H2", "2.3.232", 2, 3, "unused"));
+      var repository =
+          new JdbcContinuumRepository(database("HSQL Database Engine", "2.7.4", 2, 7, "unused"));
 
       assertThatExceptionOfType(ContinuumPersistenceException.class)
           .isThrownBy(() -> anyOperation(repository));
@@ -215,7 +223,7 @@ class PlatformGuardTest {
   class The_escape_hatch {
     @Test
     void assume_postgresql_never_touches_metadata() throws SQLException {
-      var dataSource = database("H2", "2.3.232", 2, 3, "unused");
+      var dataSource = database("HSQL Database Engine", "2.7.4", 2, 7, "unused");
       var repository = JdbcContinuumRepository.assumePostgreSql(dataSource);
 
       assertThatCode(() -> anyOperation(repository)).doesNotThrowAnyException();
@@ -240,7 +248,8 @@ class PlatformGuardTest {
     // Belt and braces for the design assumption the guard rests on: a claim, not just a find,
     // hits detection. If a future operation bypasses inTransaction, this cannot catch it — but
     // the two most different operation shapes both passing through is strong evidence.
-    var repository = new JdbcContinuumRepository(database("H2", "2.3.232", 2, 3, "unused"));
+    var repository =
+        new JdbcContinuumRepository(database("HSQL Database Engine", "2.7.4", 2, 7, "unused"));
 
     assertThatExceptionOfType(ContinuumPersistenceException.class)
         .isThrownBy(

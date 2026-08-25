@@ -13,6 +13,7 @@ properties the outbox depends on, so support means certification, not syntax.
 | PostgreSQL 9.5+ | **Certified** — full TCK, every release | `continuum-postgresql.sql` |
 | MySQL 8+ | **Certified** — full TCK, every release | `continuum-mysql.sql` |
 | MariaDB 10.6+ | **Certified** — full TCK, both drivers (its own and mysql-connector-j) | `continuum-mysql.sql` |
+| H2 2.3+ | **Certified for test/embedded use** — full TCK in default and PostgreSQL modes; not a production database | `continuum-postgresql.sql` |
 | CockroachDB | **Refused** — failed certification, twice silently | — |
 | YugabyteDB | **Refused** — failed certification loudly; a retry layer could revisit | — |
 

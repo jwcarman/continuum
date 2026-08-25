@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **H2 2.3+ is certified for test/embedded use.** It passes the full TCK in
+  both default and PostgreSQL-compatibility modes, and the reference PostgreSQL
+  DDL now serves it verbatim (`TIMESTAMP(6) WITH TIME ZONE` is spelled out
+  rather than the `TIMESTAMPTZ` alias H2 rejects — identical on PostgreSQL). A
+  Spring Boot test context wiring an H2 `DataSource` can now exercise the real
+  JDBC provider — SQL, schema, dialect — without a container, which
+  `continuum-memory` cannot offer since it bypasses SQL entirely. Not a
+  production database; the certified list says so.
+
+
 - **`continuum-jdbc` now supports MySQL 8+ and MariaDB 10.6+, certified.** All
   three platforms — PostgreSQL 9.5+, MySQL 8.4, MariaDB 11.4 — pass the full TCK
   battery, concurrency suites included, and MariaDB is certified through both

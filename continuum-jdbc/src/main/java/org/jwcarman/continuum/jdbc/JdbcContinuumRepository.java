@@ -48,10 +48,11 @@ import org.jwcarman.continuum.spi.StoredContinuation;
 
 /**
  * JDBC persistence over a plain {@link DataSource}, certified on PostgreSQL 9.5+, MySQL 8+ and
- * MariaDB 10.6+ — each of which has passed the full TCK battery, concurrency suites included.
- * Completion is a single-transaction ownership transfer; outbox claiming uses {@code FOR UPDATE
- * SKIP LOCKED} so competing consumers never block. Schema is application-owned — see the classpath
- * resources {@code continuum-postgresql.sql} and {@code continuum-mysql.sql}.
+ * MariaDB 10.6+ for production, and on H2 2.3+ for test/embedded use — each passes the full TCK
+ * battery, concurrency suites included, on every build. Completion is a single-transaction
+ * ownership transfer; outbox claiming uses {@code FOR UPDATE SKIP LOCKED} so competing consumers
+ * never block. Schema is application-owned — see the classpath resources {@code
+ * continuum-postgresql.sql} and {@code continuum-mysql.sql}.
  */
 public final class JdbcContinuumRepository implements ContinuumRepository {
 
@@ -167,6 +168,9 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
               ContinuumDialect.POSTGRESQL;
           case Platform.MySQL mysql when mysql.supportsSkipLocked() -> ContinuumDialect.MYSQL;
           case Platform.MariaDB mariadb when mariadb.supportsSkipLocked() -> ContinuumDialect.MYSQL;
+          // Certified for test/embedded use: passes the full TCK in both default and
+          // PostgreSQL-compatibility modes, and speaks the PostgreSQL DDL verbatim.
+          case Platform.H2 h2 when h2.supportsSkipLocked() -> ContinuumDialect.POSTGRESQL;
           default -> throw new ContinuumPersistenceException(refusal(platform));
         };
     dialect = resolved;
@@ -203,7 +207,8 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
         };
     return "unsupported database platform: "
         + detected
-        + "; certified platforms: PostgreSQL 9.5+, MySQL 8+, MariaDB 10.6+."
+        + "; certified platforms: PostgreSQL 9.5+, MySQL 8+, MariaDB 10.6+,"
+        + " H2 2.3+ (test/embedded only)."
         + " To use an uncertified platform anyway, construct via"
         + " JdbcContinuumRepository.withDialect(dataSource, dialect) — after running the TCK"
         + " against it.";

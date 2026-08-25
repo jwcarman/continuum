@@ -261,7 +261,7 @@ or `CHAR(36)` for UUID, `LONGBLOB`, `TIMESTAMP(6)`), a second
 mysql-connector-j-against-MariaDB pairing included, since accent exists
 precisely because that pairing lies about identity.
 
-### Unplanned: H2 (2026-08-25) — passes, admission pending a support-policy call
+### Unplanned: H2 (2026-08-25) — passes; ADMITTED as test/embedded tier (James, same day)
 
 > Not in the original phases; run because H2 is every Spring Boot shop's test
 > database and the guard refuses it by name. **26/26 in PostgreSQL compatibility
