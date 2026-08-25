@@ -20,6 +20,18 @@ All notable changes to this project will be documented in this file.
   at claim time. `JdbcContinuumRepository.assumePostgreSql(dataSource)` bypasses
   detection for operators who know better.
 
+  The refusal is now evidence-backed, not precautionary: the TCK was run
+  against both wire-compatible platforms (six runs each, ~300 races per
+  platform). CockroachDB v24.1 failed every run, twice silently — both racing
+  transactions committed, `Registered` was returned, and the delivery was never
+  created. YugabyteDB 2024.1 failed every run loudly (`Restart read required`),
+  with no silent violation observed. The skip-locked capability itself held on
+  both; what broke is `FOR UPDATE` mutual exclusion composing with the
+  ownership transfer. The certification harnesses ship in continuum-jdbc's test
+  sources as `*CertificationExperiment` — deliberately not `*IT`, so they never
+  run in a default build — runnable on demand via
+  `mvn -pl continuum-jdbc verify -Dit.test=CockroachCertificationExperiment`.
+
 
 ## [0.3.0] - 2026-08-24
 

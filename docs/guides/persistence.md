@@ -29,9 +29,20 @@ their own providers certified against the TCK.
     `JdbcContinuumRepository.assumePostgreSql(dataSource)`, accepting the
     silent-failure risk the guard exists to remove.
 
-    Certify against the TCK before trusting a wire-compatible database. The
-    concurrency battery asserts observable contract rather than mechanism, so
-    it can settle the question in both directions.
+    This is no longer a hedge: **the TCK has been run against both.** On
+    CockroachDB v24.1, six of six runs failed — usually a serialization retry
+    error (SQLSTATE 40001) the provider does not retry, and twice the silent
+    form: both racing transactions committed, `registerContinuation` returned
+    `Registered`, and the delivery was never created. No error anywhere. On
+    YugabyteDB 2024.1, six of six runs failed loudly and identically
+    (`Restart read required`, its client-must-retry signal), with no silent
+    violation observed in ~300 races.
+
+    Note the skip-locked capability itself held on both — the claiming and
+    racing suites passed every run. What broke is `FOR UPDATE` mutual
+    exclusion composing with the ownership transfer, which is exactly why
+    "accepts the syntax" and "keeps the contract" are different claims, and
+    why the guard refuses what the TCK has not certified.
 
 ### Schema — yours, not ours
 

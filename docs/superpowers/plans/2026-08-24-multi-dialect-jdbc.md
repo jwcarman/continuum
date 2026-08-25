@@ -182,6 +182,55 @@ explicit-dialect constructor becomes the escape hatch.
 
 ### Phase 2 — certify CockroachDB and YugabyteDB (first real widening)
 
+> **OUTCOME (2026-08-25): CockroachDB FAILS certification. The guard stays shut,
+> now with evidence.** Six of six runs failed, ~300 races total, in two distinct
+> modes:
+>
+> 1. **Loud (common):** SQLSTATE 40001 `RETRY_SERIALIZABLE` — CockroachDB aborts
+>    one side of a contended register-vs-complete pair and requires the client to
+>    retry; `inTransaction` does not, so it surfaces as
+>    `ContinuumPersistenceException`. Roughly one or two per 50-race battery.
+> 2. **Silent (disqualifying):** observed twice — both transactions committed,
+>    `registerContinuation` returned `Registered`, and the delivery was never
+>    created. No error anywhere. The invariant "Registered means a delivery will
+>    exist" simply did not hold. A retry-on-40001 wrapper would fix mode 1 and do
+>    nothing for this.
+>
+> Mechanism consistent with the evidence: both transactions open with
+> `SELECT ... FOR UPDATE` on the same computation row, which on PostgreSQL
+> serialises the pair entirely. The observed interleaving requires that mutual
+> exclusion to have failed at least once — consistent with CockroachDB's
+> best-effort/unreplicated `FOR UPDATE` locks. Not fully diagnosed at the
+> engine level, and does not need to be: the TCK asserts observable contract,
+> and the contract observably broke.
+>
+> Note what this does NOT contradict: accent's `supportsSkipLocked() = true`
+> for CockroachDB stands — the Claiming and Racing suites passed every run.
+> What failed is a different property (plain `FOR UPDATE` mutual exclusion
+> composing with a predicate read inside the ownership transfer), which is
+> exactly why the capability predicate is narrow and the TCK is the gate.
+>
+> **YugabyteDB (2026-08-25): fails certification too, but differently — and the
+> difference matters.** Six of six runs, ~300 races: always exactly one error,
+> always the same test (`register_vs_complete_race`), always the loud form —
+> `Restart read required`, YugabyteDB's client-must-retry signal, surfacing as
+> `ContinuumPersistenceException` because `inTransaction` does not retry.
+> **Zero silent violations observed.**
+>
+> So the two exclusions are different in kind. YugabyteDB fails in a way that
+> is in principle fixable from continuum's side: an `inTransaction` retry on
+> serialization-failure SQLSTATEs is a contained change that could make it
+> certifiable in a later phase. CockroachDB's silent mode cannot be fixed by
+> anything continuum does, because continuum never learns it happened —
+> "not supported yet, with a path" versus "not supportable on this evidence."
+>
+> The experiments live on as `CockroachCertificationExperiment` /
+> `YugabyteCertificationExperiment` — deliberately not named `*IT`, so they
+> never run in a default build (the answer is a failure; CI would be
+> permanently red). Run on demand:
+> `mvn -pl continuum-jdbc verify -Dit.test=CockroachCertificationExperiment`.
+
+
 accent measured both honouring skip-locked under contention; the TCK is the
 gate that turns that into a supported claim. Run `JdbcContinuumTckIT` against
 `cockroachdb/cockroach` and `yugabytedb/yugabyte` Testcontainers. If green:

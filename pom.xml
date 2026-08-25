@@ -449,6 +449,10 @@
                                         <!-- Embedded database discovered at test runtime by Boot's DataSource
                                              auto-configuration; no test imports an H2 class. -->
                                         <ignoredUnusedDeclaredDependency>com.h2database:h2</ignoredUnusedDeclaredDependency>
+                                        <!-- Loaded reflectively by YugabyteDBYSQLContainer's wait strategy;
+                                             no source imports it, and the experiment's own DataSource is
+                                             pgjdbc via PGSimpleDataSource, which bypasses DriverManager. -->
+                                        <ignoredUnusedDeclaredDependency>com.yugabyte:jdbc-yugabytedb</ignoredUnusedDeclaredDependency>
                                         <!-- continuum-spring-boot-starter ships no code: it is dependencies-only
                                              by design, so everything it declares is "unused" by definition. That
                                              also leaves it with the parent's inherited test dependencies and no
