@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **`continuum-jdbc` supports SQL Server 2012+, certified.** Full TCK,
+  concurrency suites included, on every build. SQL Server is the only certified
+  platform whose locking comes from a different mechanism rather than a
+  different spelling: it has no `FOR UPDATE` clause, so the pending-row lock
+  becomes a `WITH (UPDLOCK, ROWLOCK)` table hint and the skip-locked claim
+  becomes `WITH (UPDLOCK, READPAST, ROWLOCK)`. accent's `supportsSkipLocked()`
+  is deliberately `false` for SQL Server — that predicate covers the
+  `FOR UPDATE SKIP LOCKED` clause specifically — so admission gates on the 2012
+  version floor (`OFFSET/FETCH`) instead. Also adds `continuum-sqlserver.sql`
+  (`CHAR(36)`, `DATETIME2(6)`, `VARBINARY(MAX)`), and the purge subquery now
+  orders by `completed_at` on every platform: SQL Server's `OFFSET/FETCH`
+  requires an `ORDER BY`, and purging oldest-first is the right order anyway.
+
+
 - **`continuum-jdbc` supports Oracle 23ai+, certified.** Full TCK, concurrency
   suites included, on every build. Oracle brought the dialect seam its first
   genuine behavioral difference: a row-limited read cannot be locked (Oracle's

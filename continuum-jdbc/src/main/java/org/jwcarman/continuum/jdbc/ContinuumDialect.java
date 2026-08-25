@@ -23,12 +23,14 @@ import java.util.UUID;
 /**
  * What actually varies between certified platforms — which is deliberately almost nothing.
  *
- * <p>The query shapes are nearly identical across PostgreSQL, MySQL, MariaDB and Oracle. What
- * differs: how identities bind (PostgreSQL has a native {@code uuid} type; the others store {@code
- * CHAR(36)}/{@code VARCHAR2(36)} strings), the type names in each platform's reference DDL (in the
- * per-dialect {@code .sql} resource, not here), the spelling of the row-limit clause, and one real
- * behavioral difference — Oracle cannot lock through a row-limited read, so its claim query stops
- * fetching after {@code limit} rows instead of saying so in SQL.
+ * <p>The query shapes are nearly identical across PostgreSQL, MySQL, MariaDB, Oracle and SQL
+ * Server. What differs: how identities bind (PostgreSQL has a native {@code uuid} type; the others
+ * store 36-character strings), the type names in each platform's reference DDL (in the per-dialect
+ * {@code .sql} resource, not here), the spelling of the row-limit clause, and two real behavioral
+ * differences — Oracle cannot lock through a row-limited read, so its claim query stops fetching
+ * after {@code limit} rows instead of saying so in SQL; and SQL Server has no {@code FOR UPDATE}
+ * clause at all, expressing both the blocking pending-row lock and the skip-locked claim as table
+ * hints ({@code UPDLOCK, ROWLOCK} and {@code UPDLOCK, READPAST, ROWLOCK}).
  *
  * <p>Time-ordering survives the string representation: identities are UUIDv7, whose canonical text
  * form sorts identically to its byte order, so {@code CHAR(36)} keys keep the index-locality
@@ -52,6 +54,23 @@ public interface ContinuumDialect {
    * genuinely different behavior — a locking read that cannot carry a row limit.
    */
   ContinuumDialect ORACLE = new OracleDialect();
+
+  /**
+   * SQL Server 2012+: {@code CHAR(36)} identities, {@code OFFSET/FETCH} row limiting, and locking
+   * expressed as table hints rather than a trailing {@code FOR UPDATE} clause — {@code UPDLOCK,
+   * ROWLOCK} to lock, plus {@code READPAST} to skip rows another claimer holds.
+   */
+  ContinuumDialect SQLSERVER = new SqlServerDialect();
+
+  /**
+   * How a locking read is spelled: a table hint placed immediately after the table name, and a
+   * suffix appended after {@code ORDER BY}/limit. Every dialect but SQL Server uses the suffix form
+   * ({@code FOR UPDATE} / {@code FOR UPDATE SKIP LOCKED}); SQL Server uses only the hint form.
+   *
+   * @param tableHint text after the table name, or empty
+   * @param suffix text at the end of the statement, or empty
+   */
+  record Locking(String tableHint, String suffix) {}
 
   /**
    * Binds an identity parameter.
@@ -102,6 +121,25 @@ public interface ContinuumDialect {
     return true;
   }
 
+  /**
+   * The blocking lock taken on a computation's pending row before mutating it — the single lock
+   * ordering every multi-statement transaction opens with.
+   *
+   * @return the locking syntax
+   */
+  default Locking pendingRowLock() {
+    return new Locking("", " FOR UPDATE");
+  }
+
+  /**
+   * The non-blocking lock taken when claiming outbox rows: competing claimers must skip, not wait.
+   *
+   * @return the locking syntax
+   */
+  default Locking claimLock() {
+    return new Locking("", " FOR UPDATE SKIP LOCKED");
+  }
+
   final class PostgresDialect implements ContinuumDialect {
     private PostgresDialect() {}
 
@@ -147,6 +185,40 @@ public interface ContinuumDialect {
     @Override
     public boolean limitsLockingReads() {
       return false;
+    }
+  }
+
+  final class SqlServerDialect implements ContinuumDialect {
+    private SqlServerDialect() {}
+
+    @Override
+    public void setUuid(PreparedStatement statement, int index, UUID uuid) throws SQLException {
+      statement.setString(index, uuid.toString());
+    }
+
+    @Override
+    public UUID getUuid(ResultSet row, String column) throws SQLException {
+      return UUID.fromString(row.getString(column));
+    }
+
+    @Override
+    public String schemaResource() {
+      return "/org/jwcarman/continuum/jdbc/continuum-sqlserver.sql";
+    }
+
+    @Override
+    public String limitClause() {
+      return " OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY";
+    }
+
+    @Override
+    public Locking pendingRowLock() {
+      return new Locking(" WITH (UPDLOCK, ROWLOCK)", "");
+    }
+
+    @Override
+    public Locking claimLock() {
+      return new Locking(" WITH (UPDLOCK, READPAST, ROWLOCK)", "");
     }
   }
 

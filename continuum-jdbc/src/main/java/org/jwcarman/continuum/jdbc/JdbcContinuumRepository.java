@@ -48,10 +48,10 @@ import org.jwcarman.continuum.spi.StoredContinuation;
 
 /**
  * JDBC persistence over a plain {@link DataSource}, certified on PostgreSQL 9.5+, MySQL 8+, MariaDB
- * 10.6+ and Oracle 23ai+ for production, and on H2 2.3+ for test/embedded use — each passes the
- * full TCK battery, concurrency suites included, on every build. Completion is a single-transaction
- * ownership transfer; outbox claiming uses {@code FOR UPDATE SKIP LOCKED} so competing consumers
- * never block. Schema is application-owned — see the classpath resources {@code
+ * 10.6+, Oracle 23ai+ and SQL Server 2012+ for production, and on H2 2.3+ for test/embedded use —
+ * each passes the full TCK battery, concurrency suites included, on every build. Completion is a
+ * single-transaction ownership transfer; outbox claiming uses {@code FOR UPDATE SKIP LOCKED} so
+ * competing consumers never block. Schema is application-owned — see the classpath resources {@code
  * continuum-postgresql.sql} and {@code continuum-mysql.sql}.
  */
 public final class JdbcContinuumRepository implements ContinuumRepository {
@@ -172,6 +172,12 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
           // PostgreSQL-compatibility modes, and speaks the PostgreSQL DDL verbatim.
           case Platform.H2 h2 when h2.supportsSkipLocked() -> ContinuumDialect.POSTGRESQL;
           case Platform.Oracle oracle when oracle.supportsSkipLocked() -> ContinuumDialect.ORACLE;
+          // Deliberately NOT gated on supportsSkipLocked(): accent answers false for SQL Server
+          // because that predicate covers the FOR UPDATE SKIP LOCKED clause specifically, and
+          // this dialect never uses it — it locks with UPDLOCK/READPAST table hints instead.
+          // The floor is 2012 (major 11), which introduced OFFSET/FETCH row limiting.
+          case Platform.SqlServer sqlServer when sqlServer.majorVersion() >= 11 ->
+              ContinuumDialect.SQLSERVER;
           default -> throw new ContinuumPersistenceException(refusal(platform));
         };
     dialect = resolved;
@@ -192,6 +198,8 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
               "MySQL " + mysql.productVersion() + ", which lacks FOR UPDATE SKIP LOCKED";
           case Platform.MariaDB mariadb ->
               "MariaDB " + mariadb.productVersion() + ", which lacks FOR UPDATE SKIP LOCKED";
+          case Platform.SqlServer sqlServer ->
+              "SQL Server " + sqlServer.productVersion() + ", which predates OFFSET/FETCH (2012)";
           case Platform.CockroachDB cockroach ->
               "CockroachDB "
                   + cockroach.engine().raw()
@@ -209,7 +217,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
     return "unsupported database platform: "
         + detected
         + "; certified platforms: PostgreSQL 9.5+, MySQL 8+, MariaDB 10.6+, Oracle 23ai+,"
-        + " H2 2.3+ (test/embedded only)."
+        + " SQL Server 2012+, H2 2.3+ (test/embedded only)."
         + " To use an uncertified platform anyway, construct via"
         + " JdbcContinuumRepository.withDialect(dataSource, dialect) — after running the TCK"
         + " against it.";
@@ -357,7 +365,10 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
     try (PreparedStatement select =
         connection.prepareStatement(
             "SELECT kind, deadline_at, dispatch_payload, attempt_count, submitted_at "
-                + "FROM continuum_computation WHERE id = ? FOR UPDATE")) {
+                + "FROM continuum_computation"
+                + dialect().pendingRowLock().tableHint()
+                + " WHERE id = ?"
+                + dialect().pendingRowLock().suffix())) {
       dialect().setUuid(select, 1, id.value());
       try (ResultSet row = select.executeQuery()) {
         if (!row.next()) {
@@ -503,12 +514,13 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                   "SELECT id, computation_id, continuation_id, continuation_payload, "
                       + " outcome_type, outcome_payload, expiry_kind, message, attempt_count, "
                       + " submitted_at, completed_at "
-                      + "FROM continuum_outbox "
-                      + "WHERE kind = ? AND available_at <= ? "
+                      + "FROM continuum_outbox"
+                      + dialect().claimLock().tableHint()
+                      + " WHERE kind = ? AND available_at <= ? "
                       + " AND (claimed_until IS NULL OR claimed_until <= ?) "
                       + "ORDER BY available_at"
                       + (dialect().limitsLockingReads() ? dialect().limitClause() : "")
-                      + " FOR UPDATE SKIP LOCKED")) {
+                      + dialect().claimLock().suffix())) {
             select.setString(1, kind.value());
             select.setTimestamp(2, Timestamp.from(now));
             select.setTimestamp(3, Timestamp.from(now));
@@ -633,7 +645,9 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                   "DELETE FROM continuum_result WHERE computation_id IN ("
                       + "SELECT computation_id FROM ("
                       + "SELECT computation_id FROM continuum_result "
-                      + "WHERE kind = ? AND completed_at < ?"
+                      // Oldest first, on every dialect: SQL Server's OFFSET/FETCH requires an
+                      // ORDER BY, and purging the oldest results first is the right order anyway.
+                      + "WHERE kind = ? AND completed_at < ? ORDER BY completed_at"
                       + dialect().limitClause()
                       + ") purgeable)")) {
             delete.setString(1, kind.value());

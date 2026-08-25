@@ -63,7 +63,7 @@ expect SLF4J's NOP warning.
 |---|---|
 | `continuum-core` | API, typed clients, persistence SPI |
 | `continuum-memory` | In-memory persistence for tests/embedded use |
-| `continuum-jdbc` | JDBC persistence — certified on PostgreSQL, MySQL, MariaDB, Oracle |
+| `continuum-jdbc` | JDBC persistence — certified on PostgreSQL, MySQL, MariaDB, Oracle, SQL Server |
 | `continuum-testing` | TCK for certifying persistence providers |
 | `continuum-spring-boot-starter` | Boot auto-configuration (with `continuum-autoconfigure`) |
 
@@ -99,7 +99,8 @@ toolCalls.complete(computationId, new ToolCallResult(...));   // or .fail(id, "r
 
 Add `continuum-spring-boot-starter` and a `Continuum` bean is auto-configured:
 with `continuum-jdbc` on the classpath and a `DataSource` defined you get
-durable persistence on a certified platform (PostgreSQL, MySQL, MariaDB, Oracle);
+durable persistence on a certified platform (PostgreSQL, MySQL, MariaDB,
+Oracle, SQL Server);
 otherwise the starter falls back to the
 in-memory repository and logs a warning (fine for tests, not for production —
 computations will not survive restarts). An application-defined

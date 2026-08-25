@@ -139,6 +139,16 @@ class PlatformGuardTest {
     }
 
     @Test
+    void sql_server_2022_passes_despite_accent_reporting_no_skip_locked() throws SQLException {
+      // accent's supportsSkipLocked() is deliberately false for SQL Server; the dialect never uses
+      // that clause, so admission gates on the 2012 version floor instead.
+      var repository =
+          new JdbcContinuumRepository(
+              database("Microsoft SQL Server", "16.00.4265", 16, 0, "unused"));
+      assertThatCode(() -> anyOperation(repository)).doesNotThrowAnyException();
+    }
+
+    @Test
     void h2_passes_as_a_test_embedded_platform() throws SQLException {
       var repository =
           new JdbcContinuumRepository(database("H2", "2.3.232 (2024-08-11)", 2, 3, "unused"));
@@ -202,6 +212,18 @@ class PlatformGuardTest {
           .isThrownBy(() -> anyOperation(repository))
           .withMessageContaining("MySQL 5.7")
           .withMessageContaining("SKIP LOCKED");
+    }
+
+    @Test
+    void sql_server_2008_is_refused_for_predating_offset_fetch() throws SQLException {
+      var repository =
+          new JdbcContinuumRepository(
+              database("Microsoft SQL Server", "10.50.6000", 10, 50, "unused"));
+
+      assertThatExceptionOfType(ContinuumPersistenceException.class)
+          .isThrownBy(() -> anyOperation(repository))
+          .withMessageContaining("SQL Server 10.50")
+          .withMessageContaining("OFFSET/FETCH");
     }
 
     @Test

@@ -287,7 +287,16 @@ precisely because that pairing lies about identity.
 > one (`limitsLockingReads()` — Oracle cannot lock through a row-limited read,
 > so the claim caps in Java, locking rows as fetched).
 
-### Phase 4 — SQL Server, only if wanted
+### Phase 4 — SQL Server — CERTIFIED (2026-08-25)
+
+> 26/26 on mcr.microsoft.com/mssql/server:2022-latest, first run, under amd64
+> emulation on Apple Silicon. The dialect gained `pendingRowLock()` and
+> `claimLock()` — a `Locking(tableHint, suffix)` pair — because SQL Server
+> expresses both locks as table hints rather than a trailing clause. The
+> planned "only if wanted" hedge is moot: with PostgreSQL, MySQL, Oracle and
+> SQL Server all certified, coverage is the top four databases by usage.
+
+### Phase 4 (original note) — SQL Server, only if wanted
 
 First genuinely different claim statement (`WITH (UPDLOCK, READPAST)`), which
 accent's predicate deliberately does not cover. Do last; skip indefinitely

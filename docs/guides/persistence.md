@@ -14,6 +14,7 @@ properties the outbox depends on, so support means certification, not syntax.
 | MySQL 8+ | **Certified** — full TCK, every release | `continuum-mysql.sql` |
 | MariaDB 10.6+ | **Certified** — full TCK, both drivers (its own and mysql-connector-j) | `continuum-mysql.sql` |
 | Oracle 23ai+ | **Certified** — full TCK, every release | `continuum-oracle.sql` |
+| SQL Server 2012+ | **Certified** — full TCK, every release; locks via `UPDLOCK`/`READPAST` hints | `continuum-sqlserver.sql` |
 | H2 2.3+ | **Certified for test/embedded use** — full TCK in default and PostgreSQL modes; not a production database | `continuum-postgresql.sql` |
 | CockroachDB | **Refused** — failed certification, twice silently | — |
 | YugabyteDB | **Refused** — failed certification loudly; a retry layer could revisit | — |
