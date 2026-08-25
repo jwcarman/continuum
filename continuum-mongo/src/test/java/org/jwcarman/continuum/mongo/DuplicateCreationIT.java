@@ -34,7 +34,7 @@ import org.jwcarman.continuum.api.ContinuationId;
 import org.jwcarman.continuum.api.Outcome;
 import org.jwcarman.continuum.spi.ContinuumPersistenceException;
 import org.jwcarman.continuum.spi.StoredContinuation;
-import org.testcontainers.containers.MongoDBContainer;
+import org.testcontainers.mongodb.MongoDBContainer;
 
 /**
  * Pins the duplicate-creation refusal on a real server: the pending-collection pre-check inside the
@@ -44,7 +44,7 @@ import org.testcontainers.containers.MongoDBContainer;
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class DuplicateCreationIT {
 
-  private static final MongoDBContainer MONGO = new MongoDBContainer("mongo:8.2");
+  private static final MongoDBContainer MONGO = new MongoDBContainer("mongo:8.2").withReplicaSet();
   private static final MongoClient CLIENT;
   private static final String DATABASE = "continuum_duplicates";
 

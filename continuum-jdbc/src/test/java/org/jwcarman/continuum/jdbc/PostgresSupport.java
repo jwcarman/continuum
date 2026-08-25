@@ -17,13 +17,13 @@ package org.jwcarman.continuum.jdbc;
 
 import javax.sql.DataSource;
 import org.postgresql.ds.PGSimpleDataSource;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 final class PostgresSupport {
 
   private PostgresSupport() {}
 
-  static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
+  static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
 
   static {
     POSTGRES.start();

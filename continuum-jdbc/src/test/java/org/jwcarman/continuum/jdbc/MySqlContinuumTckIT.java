@@ -19,7 +19,7 @@ import com.mysql.cj.jdbc.MysqlDataSource;
 import javax.sql.DataSource;
 import org.jwcarman.continuum.spi.ContinuumRepository;
 import org.jwcarman.continuum.testing.ContinuumTck;
-import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.mysql.MySQLContainer;
 
 /**
  * MySQL 8.4 certification: the full TCK battery over the MySQL dialect and its reference DDL,
@@ -28,7 +28,7 @@ import org.testcontainers.containers.MySQLContainer;
  */
 class MySqlContinuumTckIT extends ContinuumTck {
 
-  private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4");
+  private static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4");
   private static final DataSource DATA_SOURCE;
 
   static {

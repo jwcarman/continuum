@@ -28,12 +28,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.MongoDBContainer;
+import org.testcontainers.mongodb.MongoDBContainer;
 
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class EnsureIndexesIT {
 
-  private static final MongoDBContainer MONGO = new MongoDBContainer("mongo:8.2");
+  private static final MongoDBContainer MONGO = new MongoDBContainer("mongo:8.2").withReplicaSet();
   private static final MongoClient CLIENT;
   private static final String DATABASE = "continuum_indexes";
 

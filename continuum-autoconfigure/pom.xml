@@ -30,6 +30,16 @@
     <description>Spring Boot auto-configuration for Continuum</description>
     <dependencyManagement>
         <dependencies>
+            <!-- Imported BEFORE Boot's BOM so the parent's JUnit line wins here too: a module-level
+                 BOM outranks the parent's management, and Boot pins its own JUnit — without this
+                 import the module silently tested on a different JUnit than every other module. -->
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>

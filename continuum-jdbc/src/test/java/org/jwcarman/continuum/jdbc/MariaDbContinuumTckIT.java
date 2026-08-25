@@ -19,7 +19,7 @@ import javax.sql.DataSource;
 import org.jwcarman.continuum.spi.ContinuumRepository;
 import org.jwcarman.continuum.testing.ContinuumTck;
 import org.mariadb.jdbc.MariaDbDataSource;
-import org.testcontainers.containers.MariaDBContainer;
+import org.testcontainers.mariadb.MariaDBContainer;
 
 /**
  * MariaDB 11.4 certification through its native driver: the full TCK battery over the MySQL dialect
@@ -28,7 +28,7 @@ import org.testcontainers.containers.MariaDBContainer;
  */
 class MariaDbContinuumTckIT extends ContinuumTck {
 
-  static final MariaDBContainer<?> MARIADB = new MariaDBContainer<>("mariadb:11.4");
+  static final MariaDBContainer MARIADB = new MariaDBContainer("mariadb:11.4");
   private static final DataSource DATA_SOURCE;
 
   static {

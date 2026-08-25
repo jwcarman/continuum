@@ -19,17 +19,18 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import org.jwcarman.continuum.spi.ContinuumRepository;
 import org.jwcarman.continuum.testing.ContinuumTck;
-import org.testcontainers.containers.MongoDBContainer;
+import org.testcontainers.mongodb.MongoDBContainer;
 
 /**
  * Certifies MongoDB through the ordinary detecting constructor, so the guard's admission of a
- * genuine replica set is itself under test on every build. {@code MongoDBContainer} initiates a
- * single-node replica set, which is all transactions need. The image is 8.2, not 8.0: 8.0 refuses
- * to start on Linux kernels 6.19+ (SERVER-121912), which Docker Desktop currently ships.
+ * genuine replica set is itself under test on every build. {@code withReplicaSet()} asks for a
+ * single-node replica set, which is all transactions need — Testcontainers 2 starts a standalone by
+ * default, and the guard refuses that. The image is 8.2, not 8.0: 8.0 refuses to start on Linux
+ * kernels 6.19+ (SERVER-121912), which Docker Desktop currently ships.
  */
 class MongoContinuumTckIT extends ContinuumTck {
 
-  static final MongoDBContainer MONGO = new MongoDBContainer("mongo:8.2");
+  static final MongoDBContainer MONGO = new MongoDBContainer("mongo:8.2").withReplicaSet();
   static final MongoClient CLIENT;
   static final String DATABASE = "continuum";
 

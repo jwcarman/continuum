@@ -18,7 +18,7 @@ package org.jwcarman.continuum.jdbc;
 import org.jwcarman.continuum.spi.ContinuumRepository;
 import org.jwcarman.continuum.testing.ContinuumTck;
 import org.postgresql.ds.PGSimpleDataSource;
-import org.testcontainers.containers.CockroachContainer;
+import org.testcontainers.cockroachdb.CockroachContainer;
 
 /**
  * The certification experiment behind the platform guard: does CockroachDB satisfy Continuum's

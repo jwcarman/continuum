@@ -150,7 +150,8 @@ scripted `hello`/`buildInfo` documents, the way `PlatformGuardTest` mocks
 ## Certification
 
 `MongoContinuumTckIT` extends `ContinuumTck` against `mongo:8.2` (Testcontainers
-`MongoDBContainer`, which initiates a single-node replica set) through the
+`MongoDBContainer.withReplicaSet()` — a single-node replica set; Testcontainers 2
+starts a standalone by default, which the guard refuses) through the
 detecting constructor, so the guard's admission is under test on every build
 alongside the eight JDBC configurations. The spike's
 `MongoCertificationExperiment` is superseded and not kept. `mongo:8.0` is

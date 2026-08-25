@@ -19,7 +19,7 @@ import com.microsoft.sqlserver.jdbc.SQLServerDataSource;
 import javax.sql.DataSource;
 import org.jwcarman.continuum.spi.ContinuumRepository;
 import org.jwcarman.continuum.testing.ContinuumTck;
-import org.testcontainers.containers.MSSQLServerContainer;
+import org.testcontainers.mssqlserver.MSSQLServerContainer;
 
 /**
  * SQL Server 2022 certification: the full TCK over the only dialect whose locking statements differ
@@ -32,8 +32,8 @@ import org.testcontainers.containers.MSSQLServerContainer;
  */
 class SqlServerContinuumTckIT extends ContinuumTck {
 
-  private static final MSSQLServerContainer<?> SQLSERVER =
-      new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest").acceptLicense();
+  private static final MSSQLServerContainer SQLSERVER =
+      new MSSQLServerContainer("mcr.microsoft.com/mssql/server:2022-latest").acceptLicense();
   private static final DataSource DATA_SOURCE;
 
   static {
