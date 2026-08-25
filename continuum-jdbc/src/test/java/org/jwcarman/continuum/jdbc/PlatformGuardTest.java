@@ -280,11 +280,11 @@ class PlatformGuardTest {
     // the two most different operation shapes both passing through is strong evidence.
     var repository =
         new JdbcContinuumRepository(database("HSQL Database Engine", "2.7.4", 2, 7, "unused"));
+    var kind = new ComputationKind("k");
+    var lease = Duration.ofSeconds(30);
+    var now = Instant.now();
 
     assertThatExceptionOfType(ContinuumPersistenceException.class)
-        .isThrownBy(
-            () ->
-                repository.claimDeliveries(
-                    "worker", new ComputationKind("k"), 10, Duration.ofSeconds(30), Instant.now()));
+        .isThrownBy(() -> repository.claimDeliveries("worker", kind, 10, lease, now));
   }
 }

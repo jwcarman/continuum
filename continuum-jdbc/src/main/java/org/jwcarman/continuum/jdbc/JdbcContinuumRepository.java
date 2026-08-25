@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.sql.DataSource;
 import org.jwcarman.accent.Accent;
 import org.jwcarman.accent.AccentException;
@@ -72,10 +73,63 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
   private static final String COMPLETED_AT_COLUMN = "completed_at";
   private static final String ATTEMPT_COUNT_COLUMN = "attempt_count";
 
+  private static final String LACKS_SKIP_LOCKED = ", which lacks FOR UPDATE SKIP LOCKED";
+
   private final DataSource dataSource;
-  // null means "detect on first use"; a preset dialect (escape hatches, withDialect) skips
-  // detection entirely. Volatile with a benign race: concurrent first uses resolve identically.
-  private volatile ContinuumDialect dialect;
+  // Empty means "detect on first use"; a preset dialect (escape hatches, withDialect) skips
+  // detection entirely. Benign race: concurrent first uses resolve identically.
+  private final AtomicReference<Statements> statements = new AtomicReference<>();
+
+  /**
+   * The dialect plus the four statements whose text varies by dialect, assembled exactly once when
+   * the dialect is resolved. Every parameter in them is bound; nothing caller-supplied ever reaches
+   * the text — the assembly only splices in the dialect's fixed fragments.
+   */
+  private static final class Statements {
+    private final ContinuumDialect dialect;
+    private final String lockPending;
+    private final String claim;
+    private final String expired;
+    private final String purge;
+
+    private Statements(ContinuumDialect dialect) {
+      this.dialect = dialect;
+      this.lockPending =
+          "SELECT kind, deadline_at, dispatch_payload, attempt_count, submitted_at "
+              + "FROM continuum_computation"
+              + dialect.pendingRowLock().tableHint()
+              + " WHERE id = ?"
+              + dialect.pendingRowLock().suffix();
+      this.claim =
+          "SELECT id, computation_id, continuation_id, continuation_payload, "
+              + " outcome_type, outcome_payload, expiry_kind, message, attempt_count, "
+              + " submitted_at, completed_at "
+              + "FROM continuum_outbox"
+              + dialect.claimLock().tableHint()
+              + " WHERE kind = ? AND available_at <= ? "
+              + " AND (claimed_until IS NULL OR claimed_until <= ?) "
+              + "ORDER BY available_at"
+              + (dialect.limitsLockingReads() ? dialect.limitClause() : "")
+              + dialect.claimLock().suffix();
+      this.expired =
+          "SELECT id, kind, deadline_at, dispatch_payload, attempt_count, submitted_at "
+              + "FROM continuum_computation WHERE kind = ? AND deadline_at <= ? "
+              + "ORDER BY deadline_at"
+              + dialect.limitClause();
+      // The derived table is not decoration: MySQL and MariaDB reject LIMIT directly inside an
+      // IN subquery, and separately refuse to delete from a table being selected in the same
+      // statement — wrapping the subquery in a derived table sidesteps both, and PostgreSQL
+      // accepts the same text. Oldest first, on every dialect: SQL Server's OFFSET/FETCH
+      // requires an ORDER BY, and purging the oldest results first is the right order anyway.
+      this.purge =
+          "DELETE FROM continuum_result WHERE computation_id IN ("
+              + "SELECT computation_id FROM ("
+              + "SELECT computation_id FROM continuum_result "
+              + "WHERE kind = ? AND completed_at < ? ORDER BY completed_at"
+              + dialect.limitClause()
+              + ") purgeable)";
+    }
+  }
 
   /**
    * Binds this repository to a data source. No schema is created or validated here — run {@code
@@ -99,7 +153,9 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
 
   private JdbcContinuumRepository(DataSource dataSource, ContinuumDialect preset) {
     this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
-    this.dialect = preset;
+    if (preset != null) {
+      statements.set(new Statements(preset));
+    }
   }
 
   /**
@@ -131,7 +187,11 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
   }
 
   private ContinuumDialect dialect() {
-    return dialect;
+    return statements.get().dialect;
+  }
+
+  private Statements statements() {
+    return statements.get();
   }
 
   @FunctionalInterface
@@ -142,7 +202,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
   private <T> T inTransaction(SqlWork<T> work) {
     try (Connection connection = dataSource.getConnection()) {
       connection.setAutoCommit(false);
-      if (dialect == null) {
+      if (statements.get() == null) {
         resolveDialect(connection);
       }
       return commitOrRollback(work, connection);
@@ -180,7 +240,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
               ContinuumDialect.SQLSERVER;
           default -> throw new ContinuumPersistenceException(refusal(platform));
         };
-    dialect = resolved;
+    statements.set(new Statements(resolved));
   }
 
   // Not an exhaustive switch on purpose: accent's Platform is sealed, and a new arm added there
@@ -193,11 +253,10 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
                   + postgres.majorVersion()
                   + "."
                   + postgres.minorVersion()
-                  + ", which lacks FOR UPDATE SKIP LOCKED";
-          case Platform.MySQL mysql ->
-              "MySQL " + mysql.productVersion() + ", which lacks FOR UPDATE SKIP LOCKED";
+                  + LACKS_SKIP_LOCKED;
+          case Platform.MySQL mysql -> "MySQL " + mysql.productVersion() + LACKS_SKIP_LOCKED;
           case Platform.MariaDB mariadb ->
-              "MariaDB " + mariadb.productVersion() + ", which lacks FOR UPDATE SKIP LOCKED";
+              "MariaDB " + mariadb.productVersion() + LACKS_SKIP_LOCKED;
           case Platform.SqlServer sqlServer ->
               "SQL Server " + sqlServer.productVersion() + ", which predates OFFSET/FETCH (2012)";
           case Platform.CockroachDB cockroach ->
@@ -362,13 +421,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
 
   private Computation lockAndReadPending(Connection connection, ComputationId id)
       throws SQLException {
-    try (PreparedStatement select =
-        connection.prepareStatement(
-            "SELECT kind, deadline_at, dispatch_payload, attempt_count, submitted_at "
-                + "FROM continuum_computation"
-                + dialect().pendingRowLock().tableHint()
-                + " WHERE id = ?"
-                + dialect().pendingRowLock().suffix())) {
+    try (PreparedStatement select = connection.prepareStatement(statements().lockPending)) {
       dialect().setUuid(select, 1, id.value());
       try (ResultSet row = select.executeQuery()) {
         if (!row.next()) {
@@ -509,18 +562,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
     return inTransaction(
         connection -> {
           List<ClaimedDelivery> claimed = new ArrayList<>();
-          try (PreparedStatement select =
-              connection.prepareStatement(
-                  "SELECT id, computation_id, continuation_id, continuation_payload, "
-                      + " outcome_type, outcome_payload, expiry_kind, message, attempt_count, "
-                      + " submitted_at, completed_at "
-                      + "FROM continuum_outbox"
-                      + dialect().claimLock().tableHint()
-                      + " WHERE kind = ? AND available_at <= ? "
-                      + " AND (claimed_until IS NULL OR claimed_until <= ?) "
-                      + "ORDER BY available_at"
-                      + (dialect().limitsLockingReads() ? dialect().limitClause() : "")
-                      + dialect().claimLock().suffix())) {
+          try (PreparedStatement select = connection.prepareStatement(statements().claim)) {
             select.setString(1, kind.value());
             select.setTimestamp(2, Timestamp.from(now));
             select.setTimestamp(3, Timestamp.from(now));
@@ -595,12 +637,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
     return inTransaction(
         connection -> {
           List<Computation> expired = new ArrayList<>();
-          try (PreparedStatement select =
-              connection.prepareStatement(
-                  "SELECT id, kind, deadline_at, dispatch_payload, attempt_count, submitted_at "
-                      + "FROM continuum_computation WHERE kind = ? AND deadline_at <= ? "
-                      + "ORDER BY deadline_at"
-                      + dialect().limitClause())) {
+          try (PreparedStatement select = connection.prepareStatement(statements().expired)) {
             select.setString(1, kind.value());
             select.setTimestamp(2, Timestamp.from(now));
             select.setInt(3, limit);
@@ -636,20 +673,7 @@ public final class JdbcContinuumRepository implements ContinuumRepository {
   public int purgeResults(ComputationKind kind, Instant olderThan, int limit) {
     return inTransaction(
         connection -> {
-          try (PreparedStatement delete =
-              connection.prepareStatement(
-                  // The derived table is not decoration: MySQL and MariaDB reject LIMIT
-                  // directly inside an IN subquery, and separately refuse to delete from a
-                  // table being selected in the same statement — wrapping the subquery in a
-                  // derived table sidesteps both, and PostgreSQL accepts the same text.
-                  "DELETE FROM continuum_result WHERE computation_id IN ("
-                      + "SELECT computation_id FROM ("
-                      + "SELECT computation_id FROM continuum_result "
-                      // Oldest first, on every dialect: SQL Server's OFFSET/FETCH requires an
-                      // ORDER BY, and purging the oldest results first is the right order anyway.
-                      + "WHERE kind = ? AND completed_at < ? ORDER BY completed_at"
-                      + dialect().limitClause()
-                      + ") purgeable)")) {
+          try (PreparedStatement delete = connection.prepareStatement(statements().purge)) {
             delete.setString(1, kind.value());
             delete.setTimestamp(2, Timestamp.from(olderThan));
             delete.setInt(3, limit);

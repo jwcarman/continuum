@@ -103,11 +103,7 @@ class DeliveryEnvelopeTest {
           .thenReturn(List.of(claimed));
 
       var seen = new ArrayList<TypedDelivery<String, String>>();
-      // NOTE: `seen::add` will NOT compile here — an overloaded method reference cannot
-      // disambiguate the two deliverResults overloads. An explicit lambda can.
-      int delivered =
-          client()
-              .deliverResults(BatchSize.of(10), (TypedDelivery<String, String> d) -> seen.add(d));
+      int delivered = client().deliverResults(BatchSize.of(10), seen::add);
 
       assertThat(delivered).isEqualTo(1);
       assertThat(seen)

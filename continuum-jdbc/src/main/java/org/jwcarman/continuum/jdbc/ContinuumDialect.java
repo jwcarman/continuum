@@ -140,6 +140,22 @@ public interface ContinuumDialect {
     return new Locking("", " FOR UPDATE SKIP LOCKED");
   }
 
+  /**
+   * Shared identity binding for every platform without a native UUID type: identities travel as
+   * their canonical 36-character text form, which sorts identically to UUIDv7 byte order.
+   */
+  abstract class StringUuidDialect implements ContinuumDialect {
+    @Override
+    public void setUuid(PreparedStatement statement, int index, UUID uuid) throws SQLException {
+      statement.setString(index, uuid.toString());
+    }
+
+    @Override
+    public UUID getUuid(ResultSet row, String column) throws SQLException {
+      return UUID.fromString(row.getString(column));
+    }
+  }
+
   final class PostgresDialect implements ContinuumDialect {
     private PostgresDialect() {}
 
@@ -159,18 +175,8 @@ public interface ContinuumDialect {
     }
   }
 
-  final class OracleDialect implements ContinuumDialect {
+  final class OracleDialect extends StringUuidDialect {
     private OracleDialect() {}
-
-    @Override
-    public void setUuid(PreparedStatement statement, int index, UUID uuid) throws SQLException {
-      statement.setString(index, uuid.toString());
-    }
-
-    @Override
-    public UUID getUuid(ResultSet row, String column) throws SQLException {
-      return UUID.fromString(row.getString(column));
-    }
 
     @Override
     public String schemaResource() {
@@ -188,18 +194,8 @@ public interface ContinuumDialect {
     }
   }
 
-  final class SqlServerDialect implements ContinuumDialect {
+  final class SqlServerDialect extends StringUuidDialect {
     private SqlServerDialect() {}
-
-    @Override
-    public void setUuid(PreparedStatement statement, int index, UUID uuid) throws SQLException {
-      statement.setString(index, uuid.toString());
-    }
-
-    @Override
-    public UUID getUuid(ResultSet row, String column) throws SQLException {
-      return UUID.fromString(row.getString(column));
-    }
 
     @Override
     public String schemaResource() {
@@ -222,18 +218,8 @@ public interface ContinuumDialect {
     }
   }
 
-  final class MySqlDialect implements ContinuumDialect {
+  final class MySqlDialect extends StringUuidDialect {
     private MySqlDialect() {}
-
-    @Override
-    public void setUuid(PreparedStatement statement, int index, UUID uuid) throws SQLException {
-      statement.setString(index, uuid.toString());
-    }
-
-    @Override
-    public UUID getUuid(ResultSet row, String column) throws SQLException {
-      return UUID.fromString(row.getString(column));
-    }
 
     @Override
     public String schemaResource() {
