@@ -111,7 +111,7 @@ final class Documents {
     };
   }
 
-  static String id(UUID uuid) {
+  static String idOf(UUID uuid) {
     return uuid.toString();
   }
 

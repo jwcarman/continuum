@@ -38,7 +38,7 @@ import static org.jwcarman.continuum.mongo.Documents.RESULTS;
 import static org.jwcarman.continuum.mongo.Documents.SUBMITTED_AT;
 import static org.jwcarman.continuum.mongo.Documents.binary;
 import static org.jwcarman.continuum.mongo.Documents.bytes;
-import static org.jwcarman.continuum.mongo.Documents.id;
+import static org.jwcarman.continuum.mongo.Documents.idOf;
 import static org.jwcarman.continuum.mongo.Documents.outcomeDocument;
 import static org.jwcarman.continuum.mongo.Documents.readOutcome;
 import static org.jwcarman.continuum.mongo.Documents.uuid;
@@ -177,7 +177,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
   @Override
   public void createComputation(Computation computation, StoredContinuation initial) {
     verifyTopology();
-    String id = id(computation.id().value());
+    String id = idOf(computation.id().value());
     try {
       inTransaction(
           session -> {
@@ -209,7 +209,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
   public RegistrationOutcome registerContinuation(
       ComputationId computationId, StoredContinuation continuation) {
     verifyTopology();
-    String id = id(computationId.value());
+    String id = idOf(computationId.value());
     return inTransaction(
         session -> {
           // The pending-row lock, Mongo-style: updating the pending document takes a write
@@ -239,7 +239,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
   public CompletionOutcome complete(
       ComputationId computationId, Outcome outcome, Instant completedAt) {
     verifyTopology();
-    String id = id(computationId.value());
+    String id = idOf(computationId.value());
     return inTransaction(
         session -> {
           Document pending = computations.findOneAndDelete(session, Filters.eq(ID, id));
@@ -263,7 +263,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
           for (Document continuation :
               continuations.find(session, Filters.eq(COMPUTATION_ID, id))) {
             deliveries.add(
-                new Document(ID, id(DeliveryId.random().value()))
+                new Document(ID, idOf(DeliveryId.random().value()))
                     .append(COMPUTATION_ID, id)
                     .append(CONTINUATION_ID, continuation.getString(ID))
                     .append(KIND, pending.getString(KIND))
@@ -288,7 +288,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
   @Override
   public Optional<Computation> findComputation(ComputationId computationId) {
     verifyTopology();
-    String id = id(computationId.value());
+    String id = idOf(computationId.value());
     Document pending = computations.find(Filters.eq(ID, id)).first();
     if (pending != null) {
       return Optional.of(pendingComputation(pending));
@@ -353,14 +353,14 @@ public final class MongoContinuumRepository implements ContinuumRepository {
   @Override
   public void acknowledgeDelivery(DeliveryId deliveryId) {
     verifyTopology();
-    outbox.deleteOne(Filters.eq(ID, id(deliveryId.value())));
+    outbox.deleteOne(Filters.eq(ID, idOf(deliveryId.value())));
   }
 
   @Override
   public void releaseDelivery(DeliveryId deliveryId, Instant retryAt) {
     verifyTopology();
     outbox.updateOne(
-        Filters.eq(ID, id(deliveryId.value())),
+        Filters.eq(ID, idOf(deliveryId.value())),
         Updates.combine(
             Updates.set(CLAIMED_BY, null),
             Updates.set(CLAIMED_UNTIL, null),
@@ -384,7 +384,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
   public void extendDeadline(ComputationId computationId, Instant newDeadline, int attemptCount) {
     verifyTopology();
     computations.updateOne(
-        Filters.eq(ID, id(computationId.value())),
+        Filters.eq(ID, idOf(computationId.value())),
         Updates.combine(
             Updates.set(DEADLINE_AT, newDeadline),
             Updates.set(ATTEMPT_COUNT, attemptCount),
@@ -409,7 +409,7 @@ public final class MongoContinuumRepository implements ContinuumRepository {
 
   private static Document continuationDocument(
       String computationId, StoredContinuation continuation, Instant createdAt) {
-    return new Document(ID, id(continuation.id().value()))
+    return new Document(ID, idOf(continuation.id().value()))
         .append(COMPUTATION_ID, computationId)
         .append(PAYLOAD, new Binary(continuation.payload()))
         .append(CREATED_AT, createdAt);

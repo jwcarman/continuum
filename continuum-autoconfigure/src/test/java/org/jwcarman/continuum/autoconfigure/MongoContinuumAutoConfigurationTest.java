@@ -257,9 +257,9 @@ class MongoContinuumAutoConfigurationTest {
           .thenReturn(new Document("version", "8.2.12"));
       when(database.runCommand(new Document("hello", 1)))
           .thenReturn(new Document("setName", "rs0"));
-      // The stub above routes every collection name to the same mock, so all four
-      // ensureIndexes() calls (computations, continuations, results, outbox) land on it;
-      // atLeastOnce() confirms indexing ran without over-specifying the exact count.
+      // The stub above routes every collection name to the same mock, so the index
+      // creation for all four collections lands on it; at-least-once confirms indexing
+      // ran without over-specifying the exact count.
       mongoOnly(client)
           .run(
               context ->

@@ -113,7 +113,7 @@ final class TopologyGuard {
     String leading = dot < 0 ? version : version.substring(0, dot);
     try {
       return Integer.parseInt(leading);
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException _) {
       return null;
     }
   }

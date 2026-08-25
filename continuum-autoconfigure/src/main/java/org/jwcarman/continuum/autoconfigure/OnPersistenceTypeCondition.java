@@ -91,7 +91,7 @@ final class OnPersistenceTypeCondition extends SpringBootCondition
       PersistenceType selected;
       try {
         selected = PersistenceType.valueOf(configured.toUpperCase(Locale.ROOT));
-      } catch (IllegalArgumentException e) {
+      } catch (IllegalArgumentException _) {
         // Deliberately no cause: AssertJ's rootCause() (and Boot's own failure-analysis
         // reporting) walks to the deepest throwable, and the raw enum-lookup exception names
         // neither the property nor the valid choices — only this message does.

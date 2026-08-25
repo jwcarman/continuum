@@ -85,12 +85,11 @@ class DuplicateCreationIT {
     Instant submittedAt = Instant.now();
     Instant deadline = submittedAt.plus(1, ChronoUnit.HOURS);
     repository.createComputation(computation(id, submittedAt, deadline), continuation());
+    Computation duplicate = computation(id, submittedAt, deadline);
+    StoredContinuation another = continuation();
 
     assertThatExceptionOfType(ContinuumPersistenceException.class)
-        .isThrownBy(
-            () ->
-                repository.createComputation(
-                    computation(id, submittedAt, deadline), continuation()))
+        .isThrownBy(() -> repository.createComputation(duplicate, another))
         .withMessageContaining("duplicate computation id");
   }
 
@@ -101,12 +100,11 @@ class DuplicateCreationIT {
     Instant deadline = submittedAt.plus(1, ChronoUnit.HOURS);
     repository.createComputation(computation(id, submittedAt, deadline), continuation());
     repository.complete(id, new Outcome.Success(new byte[0]), Instant.now());
+    Computation duplicate = computation(id, submittedAt, deadline);
+    StoredContinuation another = continuation();
 
     assertThatExceptionOfType(ContinuumPersistenceException.class)
-        .isThrownBy(
-            () ->
-                repository.createComputation(
-                    computation(id, submittedAt, deadline), continuation()))
+        .isThrownBy(() -> repository.createComputation(duplicate, another))
         .withMessageContaining("duplicate computation id");
   }
 }
