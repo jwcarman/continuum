@@ -49,6 +49,34 @@ forge an expiry. `ExpiryKind` tells you which reap path did it:
 `RETRY_DISALLOWED` (the kind was never retryable) or `RETRY_EXHAUSTED`
 (retrying was possible and gave up).
 
+## Three arms, and why there is no fourth
+
+There is deliberately no `cancel`. Every computation resolves to exactly one
+outcome and that outcome is delivered — failure included. `fail(id, reason)`
+does not weaken the guarantee; the answer is simply "it failed," and it
+travels the same channel as any other. That is already cancellation, minus
+the vanishing.
+
+A `cancel` that delivered nothing would give every consumer a case the
+compiler cannot show them: not a fourth arm of the `switch`, which
+exhaustiveness would force them to confront, but the delivery that never
+arrives — precisely the case a durable substrate exists to eliminate. A
+fourth `Outcome` arm fares no better: it breaks every existing switch to
+express what `Failure` with a reason already expresses.
+
+The deeper reason is architectural. Continuum does not execute the work, so
+it cannot stop it. A worker receives a `ComputationId` and reports an outcome;
+nothing flows the other way, which is what lets the creating process exit, the
+worker live in another language or datacenter, or the "worker" be a human
+clicking approve. Real cancellation would mean workers polling for status on
+the hot path of every long operation — cooperation nothing can enforce, with a
+race that never closes: a cancel arriving as the worker commits its answer
+means "cancel failed" becomes another outcome needing delivery.
+
+What the model does offer is principled early termination:
+[deadlines](retry.md). Expiry terminates the *contract* without pretending to
+terminate the *labor*, and it is delivered like everything else.
+
 ## Memoized results
 
 Terminal outcomes are retained in the result record so that:
