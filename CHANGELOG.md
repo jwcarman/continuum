@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-26
+
 ### Changed
 
 - codec 0.6.0 (from 0.4.0). Purely additive upstream — new backends and
@@ -249,6 +251,7 @@ means only "this row was written".
 See the [documentation](https://jwcarman.github.io/continuum/) for the full
 tour.
 
+[0.5.0]: https://github.com/jwcarman/continuum/releases/tag/0.5.0
 [0.4.0]: https://github.com/jwcarman/continuum/releases/tag/0.4.0
 [0.3.0]: https://github.com/jwcarman/continuum/releases/tag/0.3.0
 [0.2.0]: https://github.com/jwcarman/continuum/releases/tag/0.2.0
